@@ -20,6 +20,9 @@ def run_main_program(pParser: Parser):
         lSonar.test_connectivity()
         exit(0)
 
+    if pParser.quota:
+        lSonar.check_quota()
+        exit(0)
 
 if __name__ == '__main__':
 
@@ -44,7 +47,10 @@ if __name__ == '__main__':
                             help='Show examples and exit',
                             action='store_true')
     requiredAguments.add_argument('-t', '--test',
-                            help='Test connectivity and exit',
+                            help='Test connectivity to Rapid7 Open Data API and exit',
+                            action='store_true')
+    requiredAguments.add_argument('-q', '--quota',
+                            help='Display Rapid7 Open Data API quota and exit',
                             action='store_true')
 
     run_main_program(pParser=Parser(pArgs=lArgParser.parse_args(), pConfig=Config))

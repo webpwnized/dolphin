@@ -8,6 +8,7 @@ class Parser:
     __mDebug: bool = False
     __mVerbose: bool = False
     __mTestConnectivity: bool = False
+    __mCheckQuota: bool = False
     __mRapid7OpenAPIKeyFilePath: str = ""
     __mShowExamples: bool = False
     __mPrinter: Printer = Printer
@@ -39,6 +40,10 @@ class Parser:
         return self.__mTestConnectivity
 
     @property  # getter method
+    def quota(self) -> bool:
+        return self.__mCheckQuota
+
+    @property  # getter method
     def rapid7_open_api_key_file_path(self) -> str:
         return self.__mRapid7OpenAPIKeyFilePath
 
@@ -48,6 +53,7 @@ class Parser:
         self.__mConfiguration = pConfig
         self.__mVerbose = self.__mArgs.verbose
         self.__mTestConnectivity = self.__mArgs.test
+        self.__mCheckQuota = self.__mArgs.quota
         self.__parse_arg_debug()
         self.__mShowExamples = self.__mArgs.examples
         self.__parse_rapid7_open_api_key_file_path()

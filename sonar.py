@@ -1,5 +1,6 @@
 from printer import Printer, Level
 import urllib.request
+import json
 
 class Sonar:
 
@@ -84,6 +85,20 @@ class Sonar:
         except urllib.error.URLError as e:
             self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(e.reason), Level.ERROR)
 
+    def check_quota(self) -> None:
+        self.__mPrinter.print("Connecting to Rapid7 Open API", Level.INFO)
+        lHTTPRequest = urllib.request.Request(self.__cQUOTA_URL)
+        lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
+        try:
+            lHTTPResponse = urllib.request.urlopen(lHTTPRequest)
+            self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
+            lJSON = json.loads(lHTTPResponse.read().decode('utf-8'))
+            for key, value in lJSON.items():
+                print(key, value)
+        except urllib.error.HTTPError as lHTTPError:
+            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason), Level.ERROR)
+        except urllib.error.URLError as e:
+            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(e.reason), Level.ERROR)
     # ---------------------------------
     # public static class methods
     # ---------------------------------
