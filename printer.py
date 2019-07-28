@@ -1,4 +1,5 @@
 from enum import Enum
+import curses
 
 class Level(Enum):
     INFO = 0
@@ -25,7 +26,7 @@ class Printer:
     __mVerbose: bool = False
     __mDebug: bool = False
     __mColorMap = {
-        Level.INFO: __white,
+        Level.INFO: __blue,
         Level.WARNING: __yellow,
         Level.ERROR: __red,
         Level.SUCCESS: __green,

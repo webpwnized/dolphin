@@ -1,5 +1,6 @@
 from printer import Printer, Level
 import urllib.request
+import urllib.error
 import json
 
 class Sonar:
@@ -8,7 +9,9 @@ class Sonar:
     # "Private" static class variables
     # ---------------------------------
     __cAPI_KEY_HEADER: str = "X-Api-Key"
-    __cQUOTA_URL: str = "https://us.api.insight.rapid7.com/opendata/quota/"
+    __cBASE_URL: str = "https://us.api.insight.rapid7.com/opendata/"
+    __cQUOTA_URL: str = ''.join([__cBASE_URL, "quota/"])
+    __cSTUDIES_URL: str = ''.join([__cBASE_URL, "studies/"])
 
     __mAPIKey: str = ""
     __mDebug: bool = False
@@ -52,13 +55,16 @@ class Sonar:
         self.__mDebug: bool = False
         self.__mPrinter.verbose = False
         self.__mPrinter.debug = False
-        self.__parse_api_key()
+        self.__do_common_init_tasks()
 
     def __init__(self, pVerbose: bool, pDebug: bool) -> None:
         self.__mVerbose: bool = pVerbose
         self.__mDebug: bool = pDebug
         self.__mPrinter.verbose = pVerbose
         self.__mPrinter.debug = pDebug
+        self.__do_common_init_tasks()
+
+    def __do_common_init_tasks(self):
         self.__parse_api_key()
 
     # ---------------------------------
@@ -70,35 +76,46 @@ class Sonar:
             self.__mAPIKey = lKeyFile.readline()
         self.__mPrinter.print("Rapid7 Open API key: {}".format(self.__mAPIKey), Level.INFO)
 
+    def __connect_to_open_data_api(self, pURL: str):
+        self.__mPrinter.print("Connecting to Rapid7 Open API", Level.INFO)
+        lHTTPRequest = urllib.request.Request(pURL)
+        lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
+        try:
+            lHTTPResponse = urllib.request.urlopen(lHTTPRequest)
+            self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
+            return lHTTPResponse
+        except urllib.error.HTTPError as lHTTPError:
+            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason),
+                                  Level.ERROR)
+        except urllib.error.URLError as lURLError:
+            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(lURLError.reason), Level.ERROR)
+
     # ---------------------------------
     # public instance methods
     # ---------------------------------
     def test_connectivity(self) -> None:
-        self.__mPrinter.print("Testing connectivity to Rapid7 Open API", Level.INFO)
-        lHTTPRequest = urllib.request.Request(self.__cQUOTA_URL)
-        lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
-        try:
-            lHTTPResponse = urllib.request.urlopen(lHTTPRequest)
-            self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
-        except urllib.error.HTTPError as lHTTPError:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason), Level.ERROR)
-        except urllib.error.URLError as e:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(e.reason), Level.ERROR)
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
 
     def check_quota(self) -> None:
-        self.__mPrinter.print("Connecting to Rapid7 Open API", Level.INFO)
-        lHTTPRequest = urllib.request.Request(self.__cQUOTA_URL)
-        lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
-        try:
-            lHTTPResponse = urllib.request.urlopen(lHTTPRequest)
-            self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
-            lJSON = json.loads(lHTTPResponse.read().decode('utf-8'))
-            for key, value in lJSON.items():
-                print(key, value)
-        except urllib.error.HTTPError as lHTTPError:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason), Level.ERROR)
-        except urllib.error.URLError as e:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(e.reason), Level.ERROR)
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+        lJSON = json.loads(lHTTPResponse.read().decode('utf-8'))
+        Printer.print("{}/{} requests used in last {} hours".format(
+            lJSON['quota_used'],lJSON['quota_allowed'],int(int(lJSON['quota_timespan'])/3600)), Level.INFO
+        )
+
+    def list_studies(self) -> None:
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cSTUDIES_URL)
+        lJSON = json.loads(lHTTPResponse.read().decode('utf-8'))
+        #print(lJSON)
+        for item in lJSON:
+            #for key, value in item.items():
+            #    print(key,value)
+            print("{} {}".format(item['uniqid'],item['name']))
+            print("Updated: {}".format(item['updated_at']))
+            #print("File set: {}".format(item['sonarfile_set']))
+            print("\t{}".format(item['long_desc']))
+            print()
+
     # ---------------------------------
     # public static class methods
     # ---------------------------------

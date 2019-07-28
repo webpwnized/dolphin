@@ -5,7 +5,7 @@
 
 ## Dependencies
 
-pip install requests
+None
 
 ## References
 

@@ -11,11 +11,8 @@ class Parser:
     __mCheckQuota: bool = False
     __mRapid7OpenAPIKeyFilePath: str = ""
     __mShowExamples: bool = False
+    __mListStudies: bool = False
     __mPrinter: Printer = Printer
-
-    @property  # getter method
-    def show_examples(self) -> bool:
-        return self.__mShowExamples
 
     @property  # getter method
     def debug(self) -> bool:
@@ -36,12 +33,20 @@ class Parser:
         self.__mPrinter.verbose = pVerbose
 
     @property  # getter method
+    def show_examples(self) -> bool:
+        return self.__mShowExamples
+
+    @property  # getter method
     def test(self) -> bool:
         return self.__mTestConnectivity
 
     @property  # getter method
     def quota(self) -> bool:
         return self.__mCheckQuota
+
+    @property  # getter method
+    def list(self) -> bool:
+        return self.__mListStudies
 
     @property  # getter method
     def rapid7_open_api_key_file_path(self) -> str:
@@ -56,6 +61,7 @@ class Parser:
         self.__mCheckQuota = self.__mArgs.quota
         self.__parse_arg_debug()
         self.__mShowExamples = self.__mArgs.examples
+        self.__mListStudies = self.__mArgs.list
         self.__parse_rapid7_open_api_key_file_path()
 
     # private methods
@@ -66,7 +72,4 @@ class Parser:
             self.__mDebug = self.__mConfiguration.DEBUG
 
     def __parse_rapid7_open_api_key_file_path(self) -> None:
-        if self.__mArgs.debug:
-            self.__mDebug = self.__mArgs.debug
-        else:
-            self.__mRapid7OpenAPIKeyFilePath = self.__mConfiguration.RAPID7_OPEN_API_KEY_FILE_PATH
+        self.__mRapid7OpenAPIKeyFilePath = self.__mConfiguration.RAPID7_OPEN_API_KEY_FILE_PATH

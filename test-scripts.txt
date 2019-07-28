@@ -1,0 +1,14 @@
+Show Help
+python3 dolphin.py -h
+
+Show Examples
+python3 dolphin.py -v -e
+
+Test Connectivity to Rapid7 Open Data API
+python3 dolphin.py -v -t
+
+Fetch Quota from Rapid7 Open Data API
+python3 dolphin.py -v -q
+
+Fetch Studies from Rapid7 Open Data API
+python3 dolphin.py -v -l

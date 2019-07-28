@@ -14,15 +14,16 @@ def run_main_program(pParser: Parser):
 
     if pParser.show_examples:
         Printer.print_example_usage()
-        exit(0)
 
     if pParser.test:
         lSonar.test_connectivity()
-        exit(0)
 
     if pParser.quota:
         lSonar.check_quota()
-        exit(0)
+
+    if pParser.list:
+        lSonar.list_studies()
+
 
 if __name__ == '__main__':
 
@@ -51,6 +52,9 @@ if __name__ == '__main__':
                             action='store_true')
     requiredAguments.add_argument('-q', '--quota',
                             help='Display Rapid7 Open Data API quota and exit',
+                            action='store_true')
+    requiredAguments.add_argument('-l', '--list',
+                            help='List available Rapid7 Open Data studies and exit',
                             action='store_true')
 
     run_main_program(pParser=Parser(pArgs=lArgParser.parse_args(), pConfig=Config))
