@@ -8,7 +8,7 @@ import argparse
 
 def run_main_program(pParser: Parser):
 
-    lSonar = Sonar(pParser.verbose, pParser.debug)
+    lSonar = Sonar(pParser.verbose, pParser.debug, pParser.rapid7_open_api_key_file_path, pParser.studies_of_interest)
     Printer.verbose = pParser.verbose
     Printer.debug = pParser.debug
 
@@ -21,9 +21,11 @@ def run_main_program(pParser: Parser):
     if pParser.quota:
         lSonar.check_quota()
 
-    if pParser.list:
+    if pParser.list_studies:
         lSonar.list_studies()
 
+    if pParser.update_studies:
+        lSonar.update_studies()
 
 if __name__ == '__main__':
 
@@ -53,8 +55,11 @@ if __name__ == '__main__':
     requiredAguments.add_argument('-q', '--quota',
                             help='Display Rapid7 Open Data API quota and exit',
                             action='store_true')
-    requiredAguments.add_argument('-l', '--list',
+    requiredAguments.add_argument('-l', '--list-studies',
                             help='List available Rapid7 Open Data studies and exit',
+                            action='store_true')
+    requiredAguments.add_argument('-u', '--update-studies',
+                            help='Update database using available Rapid7 Open Data studies and exit',
                             action='store_true')
 
     run_main_program(pParser=Parser(pArgs=lArgParser.parse_args(), pConfig=Config))

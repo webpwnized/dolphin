@@ -9,9 +9,12 @@ class Parser:
     __mVerbose: bool = False
     __mTestConnectivity: bool = False
     __mCheckQuota: bool = False
-    __mRapid7OpenAPIKeyFilePath: str = ""
     __mShowExamples: bool = False
     __mListStudies: bool = False
+    __mUpdateStudies: bool = False
+    __mRapid7OpenAPIKeyFilePath: str = ""
+    __mStudiesOfInterest: list = []
+    __mDatabaseFilename: str = ""
     __mPrinter: Printer = Printer
 
     @property  # getter method
@@ -45,12 +48,20 @@ class Parser:
         return self.__mCheckQuota
 
     @property  # getter method
-    def list(self) -> bool:
+    def list_studies(self) -> bool:
         return self.__mListStudies
+
+    @property  # getter method
+    def update_studies(self) -> bool:
+        return self.__mUpdateStudies
 
     @property  # getter method
     def rapid7_open_api_key_file_path(self) -> str:
         return self.__mRapid7OpenAPIKeyFilePath
+
+    @property  # getter method
+    def studies_of_interest(self) -> list:
+        return self.__mStudiesOfInterest
 
     # Constructor Method
     def __init__(self: object, pArgs, pConfig: Config) -> None:
@@ -61,8 +72,11 @@ class Parser:
         self.__mCheckQuota = self.__mArgs.quota
         self.__parse_arg_debug()
         self.__mShowExamples = self.__mArgs.examples
-        self.__mListStudies = self.__mArgs.list
-        self.__parse_rapid7_open_api_key_file_path()
+        self.__mListStudies = self.__mArgs.list_studies
+        self.__mUpdateStudies = self.__mArgs.update_studies
+        self.__mRapid7OpenAPIKeyFilePath = self.__mConfiguration.RAPID7_OPEN_API_KEY_FILE_PATH
+        self.__mStudiesOfInterest = self.__mConfiguration.STUDIES_OF_INTEREST
+        self.__mDatabaseFilename = self.__mConfiguration.DATABASE_FILENAME
 
     # private methods
     def __parse_arg_debug(self) -> None:
@@ -70,6 +84,3 @@ class Parser:
             self.__mDebug = self.__mArgs.debug
         else:
             self.__mDebug = self.__mConfiguration.DEBUG
-
-    def __parse_rapid7_open_api_key_file_path(self) -> None:
-        self.__mRapid7OpenAPIKeyFilePath = self.__mConfiguration.RAPID7_OPEN_API_KEY_FILE_PATH

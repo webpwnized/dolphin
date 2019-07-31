@@ -89,7 +89,16 @@ class Printer:
     @staticmethod
     def print_example_usage():
         print("""
-    Show available files\n
-    \tpython3 dolphin.py --verbose --show-studies
-    \tpython3 byepass.py -v -s
+Test connectivity to Rapid7 Open Data API\n
+\tpython3 dolphin.py --verbose --test
+\tpython3 byepass.py -v -t
+\nDisplay Rapid7 Open Data API quota\n
+\tpython3 dolphin.py --verbose --quota
+\tpython3 byepass.py -v -q
+\nList available Rapid7 Open Data studies\n
+\tpython3 dolphin.py --verbose --list-studies
+\tpython3 byepass.py -v -l
+\nUpdate database using available Rapid7 Open Data studies\n
+\tpython3 dolphin.py --verbose --update-studies
+\tpython3 byepass.py -v -u
     """)

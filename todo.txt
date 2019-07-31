@@ -1,30 +1,37 @@
+
+If study is updated, parse the fileset metadata
+    Compare the last update data to current update date
+If the file is new, consider the file metadata
+If the file is wanted, download the file
+If the file is downloaded, parse out the wanted results
+
 sonar.tcp TCP Scans
 Updated: 2019-07-27
 	The dataset contains regular snapshots of the responses to zmap probes against common TCP services
 
-sonar.ssl SSL Certificates
-Updated: 2019-07-27
-	The dataset contains a collection of metadata related to the net new X.509 certificates observed in each study when considering all SSL studies that ran prior.  The _hosts and _endpoints files provide mapping between the IPs/endpoints and the fingerprint of the X.509 certificate presented.  The _certs file provides a mapping of the net new certificates from a given study and the corresponding fingerprint.  The _names file provides a mapping of the X.509 certificate name (CN) to its fingerprint.
-
-sonar.http HTTP GET Responses
-Updated: 2019-07-27
-	Ths dataset contains the responses to HTTP/1.1 GET requests performed against a variety of IPv4 public HTTP endpoints
+sonar.udp UDP Scans
+Updated: 2019-07-03
+	The dataset contains regular snapshots of the responses to zmap probes against common UDP services
 
 sonar.fdns_v2 Forward DNS (FDNS)
 Updated: 2019-07-27
 	This dataset contains the responses to DNS requests for all forward DNS names known by Rapid7's Project Sonar.  Until early November 2017, all of these were for the 'ANY' record with a fallback A and AAAA request if neccessary.  After that, the ANY study represents only the responses to ANY requests, and dedicated studies were created for the A, AAAA, CNAME and TXT record lookups with appropriately named files.  The file is a GZIP compressed file containing the name, type, value and timestamp of any returned records for a given name in JSON format.
 
-sonar.https HTTPS GET Responses
-Updated: 2019-07-27
-	This study performs an HTTP/1.1 GET after establishing an SSL/TLS connection to HTTPS endpoints.  If a valid hostname is found in the SSL certificate CN, that value is used as the HTTP/1.1 Host header, otherwise the IPv4 address is used
-
 sonar.rdns_v2 Reverse DNS (RDNS)
 Updated: 2019-07-24
 	This dataset includes the responses to the IPv4 PTR lookups for all non-blacklisted/private IPv4 addresses.
 
-sonar.udp UDP Scans
-Updated: 2019-07-03
-	The dataset contains regular snapshots of the responses to zmap probes against common UDP services
+sonar.http HTTP GET Responses
+Updated: 2019-07-27
+	Ths dataset contains the responses to HTTP/1.1 GET requests performed against a variety of IPv4 public HTTP endpoints
+
+sonar.https HTTPS GET Responses
+Updated: 2019-07-27
+	This study performs an HTTP/1.1 GET after establishing an SSL/TLS connection to HTTPS endpoints.  If a valid hostname is found in the SSL certificate CN, that value is used as the HTTP/1.1 Host header, otherwise the IPv4 address is used
+
+sonar.ssl SSL Certificates
+Updated: 2019-07-27
+	The dataset contains a collection of metadata related to the net new X.509 certificates observed in each study when considering all SSL studies that ran prior.  The _hosts and _endpoints files provide mapping between the IPs/endpoints and the fingerprint of the X.509 certificate presented.  The _certs file provides a mapping of the net new certificates from a given study and the corresponding fingerprint.  The _names file provides a mapping of the X.509 certificate name (CN) to its fingerprint.
 
 sonar.moressl More SSL Certificates (non-443)
 Updated: 2019-07-25
