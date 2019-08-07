@@ -6,25 +6,26 @@ import config as Config
 import argparse
 
 
-def run_main_program(pParser: Parser):
+def run_main_program():
 
-    lSonar = Sonar(pParser.verbose, pParser.debug, pParser.rapid7_open_api_key_file_path, pParser.studies_of_interest)
-    Printer.verbose = pParser.verbose
-    Printer.debug = pParser.debug
-
-    if pParser.show_examples:
+    if Parser.show_examples:
         Printer.print_example_usage()
+        exit(0)
 
-    if pParser.test:
+    lSonar = Sonar(p_parser=Parser)
+    Printer.verbose = Parser.verbose
+    Printer.debug = Parser.debug
+
+    if Parser.test_connectivity:
         lSonar.test_connectivity()
 
-    if pParser.quota:
+    if Parser.check_quota:
         lSonar.check_quota()
 
-    if pParser.list_studies:
+    if Parser.list_studies:
         lSonar.list_studies()
 
-    if pParser.update_studies:
+    if Parser.update_studies:
         lSonar.update_studies()
 
 if __name__ == '__main__':
@@ -62,4 +63,5 @@ if __name__ == '__main__':
                             help='Update database using available Rapid7 Open Data studies and exit',
                             action='store_true')
 
-    run_main_program(pParser=Parser(pArgs=lArgParser.parse_args(), pConfig=Config))
+    Parser.parse_configuration(p_args=lArgParser.parse_args(), p_config=Config)
+    run_main_program()

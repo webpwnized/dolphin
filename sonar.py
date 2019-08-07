@@ -1,13 +1,15 @@
 from printer import Printer, Level
+from database import SQLite
 import urllib.request
 import urllib.error
 import json
 from datetime import datetime
+from argparser import Parser
 
 class Sonar:
 
     # ---------------------------------
-    # "Private" static class variables
+    # "Private" class variables
     # ---------------------------------
     __cAPI_KEY_HEADER: str = "X-Api-Key"
     __cBASE_URL: str = "https://us.api.insight.rapid7.com/opendata/"
@@ -31,7 +33,7 @@ class Sonar:
     __mPrinter: Printer = Printer
 
     # ---------------------------------
-    # "Public" static class variables
+    # "Public" class variables
     # ---------------------------------
     @property  # getter method
     def verbose(self) -> bool:
@@ -78,26 +80,29 @@ class Sonar:
     # ---------------------------------
     # public instance constructor
     # ---------------------------------
-    def __init__(self, pAPIKeyFile: str, pStudiesOfInterest: list) -> None:
-        self.__mAPIKeyFile = pAPIKeyFile
-        self.__mStudiesOfInterest = pStudiesOfInterest
-        self.__do_common_init_tasks()
-
-    def __init__(self, pVerbose: bool, pDebug: bool, pAPIKeyFile: str, pStudiesOfInterest: list) -> None:
-        self.__mVerbose: bool = pVerbose
-        self.__mDebug: bool = pDebug
-        self.__mPrinter.verbose = pVerbose
-        self.__mPrinter.debug = pDebug
-        self.__mAPIKeyFile = pAPIKeyFile
-        self.__mStudiesOfInterest = pStudiesOfInterest
-        self.__do_common_init_tasks()
-
-    def __do_common_init_tasks(self):
+    def __init__(self, p_parser: Parser) -> None:
+        self.__mVerbose: bool = Parser.verbose
+        self.__mDebug: bool = Parser.debug
+        self.__mPrinter.verbose = Parser.verbose
+        self.__mPrinter.debug = Parser.debug
+        self.__mAPIKeyFile = Parser.rapid7_open_api_key_file_path
+        self.__mStudiesOfInterest = Parser.studies_of_interest
+        SQLite.database_filename = Parser.database_filename
         self.__parse_api_key()
 
     # ---------------------------------
     # private instance methods
     # ---------------------------------
+    def __initialize_database(self) -> None:
+        if not self.__verify_database_exists():
+            self.__create_database()
+
+    def __verify_database_exists(self) -> bool:
+        return SQLite.verify_database_exists()
+
+    def __create_database(self) -> None:
+        SQLite.create_database()
+
     def __parse_api_key(self) -> None:
         self.__mPrinter.print("Reading Rapid7 Open API key", Level.INFO)
         with open(self.api_key_file) as lKeyFile:
@@ -125,6 +130,9 @@ class Sonar:
         lHTTPResponse = self.__connect_to_open_data_api(self.__cSTUDIES_URL)
         return(json.loads(lHTTPResponse.read().decode('utf-8')))
 
+    def __study_is_interesting(self, p_study: dict) -> bool:
+        return(p_study['uniqid'] in self.studies_of_interest)
+
     def __print_study_metadata(self, pStudy: dict) -> None:
         Printer.print("Found study of interest", Level.SUCCESS)
         Printer.print("{} {}".format(pStudy['uniqid'], pStudy['name']), Level.INFO)
@@ -133,16 +141,13 @@ class Sonar:
         Printer.print("{}".format(pStudy['long_desc']), Level.INFO)
         Printer.print("{} files are available".format(len(pStudy['sonarfile_set'])), Level.INFO)
 
-    def __study_is_interesting(self, p_study: dict) -> bool:
-        return(p_study['uniqid'] in self.studies_of_interest)
-
     def __parse_study_filename(self, p_filename: str) -> None:
         lParts = p_filename.split('.')[0].split('-')
         print("Filename: {}".format(p_filename))
         print("Year: {}".format(lParts[self.__cYEAR]))
         print("Month: {}".format(lParts[self.__cMONTH]))
         print("Day: {}".format(lParts[self.__cDAY]))
-        print("Time: {}".format(datetime.fromtimestamp((float(lParts[self.__cEPOCH_TIME])))))
+        print("Timestamp: {}".format(datetime.fromtimestamp((float(lParts[self.__cEPOCH_TIME])))))
         l_protocol_port = lParts[self.__cFILESET].rsplit('_', self.__cLAST_OCCURENCE)
         print("Protocol: {}".format(l_protocol_port[self.__cPROTOCOL]))
         print("Port: {}".format(l_protocol_port[self.__cPORT]))
@@ -170,13 +175,14 @@ class Sonar:
 
     def update_studies(self) -> None:
 
-        l_studies = self.__get_studies()
-        for l_study in l_studies:
-            if self.__study_is_interesting(l_study):
-                self.__print_study_metadata(l_study)
-                for l_filename in l_study['sonarfile_set']:
-                    self.__parse_study_filename(l_filename)
-                print()
+        self.__initialize_database()
+        l_studies: list = self.__get_studies()
+
+        # for l_study in l_studies:
+        #     if self.__study_is_interesting(l_study):
+        #         self.__print_study_metadata(l_study)
+        #         for l_filename in l_study['sonarfile_set']:
+        #             self.__parse_study_filename(l_filename)
 
     # ---------------------------------
     # public static class methods

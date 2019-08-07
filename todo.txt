@@ -1,9 +1,14 @@
 
+Update the "last updated" date
+
+If the study is wanted
 If study is updated, parse the fileset metadata
-    Compare the last update data to current update date
+    If file is wanted, update the list of files checked
+        study-uniqid, filename (PK), year, month, day, timestamp, protocol, port, parsed="N"
 If the file is new, consider the file metadata
 If the file is wanted, download the file
 If the file is downloaded, parse out the wanted results
+Delete the file before moving to the next file
 
 sonar.tcp TCP Scans
 Updated: 2019-07-27
