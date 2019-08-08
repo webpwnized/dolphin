@@ -22,7 +22,7 @@ class SQLite():
             l_database_file_uri: str = 'file:{}?mode={}'.format(pathname2url(SQLite.database_filename), p_mode.value)
             l_connection: sqlite3.Connection = sqlite3.connect(l_database_file_uri, uri=True)
             Printer.print("Connected to SQLite version {} database".format(sqlite3.sqlite_version), Level.SUCCESS)
-            l_query:str = "SELECT * FROM pragma_database_list;"
+            l_query:str = "SELECT * FROM pragma_database_list();"
             l_rows = SQLite.__execute_query(l_connection, l_query)
             for l_row in l_rows:
                 Printer.print("Attached database: {}".format(l_row[SQLite.ATTACHED_DATABASE_FILENAME]), Level.INFO)
@@ -64,7 +64,10 @@ class SQLite():
         try:
             Printer.print("Checking if database is available", Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
-            return SQLite.__verify_table_exists(l_connection, "study_files")
+            if l_connection:
+                return SQLite.__verify_table_exists(l_connection, "study_files")
+            else:
+                return False
         except sqlite3.Error as l_error:
             Printer.print("Error connecting to database: {}".format(l_error), Level.WARNING)
             return False

@@ -122,7 +122,7 @@ class Sonar:
         except urllib.error.URLError as lURLError:
             self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(lURLError.reason), Level.ERROR)
 
-    def __get_studies(self) -> dict:
+    def __get_studies(self) -> list:
         # Open Data API --> studies
         # "uniqid","name","short_desc","long_desc","study_url","study_name","study_venue",
         # "study_bibtext","contact_name","contact_email","organization_name","organization_website",
@@ -134,6 +134,10 @@ class Sonar:
         return(p_study['uniqid'] in self.studies_of_interest)
 
     def __print_study_metadata(self, pStudy: dict) -> None:
+        # Open Data API --> studies
+        # "uniqid","name","short_desc","long_desc","study_url","study_name","study_venue",
+        # "study_bibtext","contact_name","contact_email","organization_name","organization_website",
+        # "created_at","updated_at","sonarfile_set"
         Printer.print("Found study of interest", Level.SUCCESS)
         Printer.print("{} {}".format(pStudy['uniqid'], pStudy['name']), Level.INFO)
         Printer.print("Updated: {}".format(pStudy['updated_at']), Level.INFO)
@@ -148,9 +152,19 @@ class Sonar:
         print("Month: {}".format(lParts[self.__cMONTH]))
         print("Day: {}".format(lParts[self.__cDAY]))
         print("Timestamp: {}".format(datetime.fromtimestamp((float(lParts[self.__cEPOCH_TIME])))))
+
         l_protocol_port = lParts[self.__cFILESET].rsplit('_', self.__cLAST_OCCURENCE)
-        print("Protocol: {}".format(l_protocol_port[self.__cPROTOCOL]))
-        print("Port: {}".format(l_protocol_port[self.__cPORT]))
+        if l_protocol_port.__len__() == 2 and str.isdigit(l_protocol_port[1]):
+            Printer.print("Protocol: {}".format(l_protocol_port[0]), Level.INFO)
+            Printer.print("Port: {}".format(l_protocol_port[1]), Level.INFO)
+        elif l_protocol_port.__len__() == 2:
+            Printer.print("Protocol: {} {}".format(l_protocol_port[0], l_protocol_port[1]), Level.INFO)
+        elif l_protocol_port.__len__() == 1:
+            Printer.print("Protocol: {}".format(l_protocol_port[0]), Level.INFO)
+        else:
+            Printer.print("Unexpected format: {}".format(l_protocol_port), Level.WARNING)
+
+
 
     # ---------------------------------
     # public instance methods
@@ -178,11 +192,11 @@ class Sonar:
         self.__initialize_database()
         l_studies: list = self.__get_studies()
 
-        # for l_study in l_studies:
-        #     if self.__study_is_interesting(l_study):
-        #         self.__print_study_metadata(l_study)
-        #         for l_filename in l_study['sonarfile_set']:
-        #             self.__parse_study_filename(l_filename)
+        for l_study in l_studies:
+            if self.__study_is_interesting(l_study):
+                self.__print_study_metadata(l_study)
+                for l_filename in l_study['sonarfile_set']:
+                    self.__parse_study_filename(l_filename)
 
     # ---------------------------------
     # public static class methods
