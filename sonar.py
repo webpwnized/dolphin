@@ -1,5 +1,6 @@
 from printer import Printer, Level
 from database import SQLite
+from database import StudyFileRecord
 import urllib.request
 import urllib.error
 import json
@@ -145,26 +146,48 @@ class Sonar:
         Printer.print("{}".format(pStudy['long_desc']), Level.INFO)
         Printer.print("{} files are available".format(len(pStudy['sonarfile_set'])), Level.INFO)
 
-    def __parse_study_filename(self, p_filename: str) -> None:
-        lParts = p_filename.split('.')[0].split('-')
-        print("Filename: {}".format(p_filename))
-        print("Year: {}".format(lParts[self.__cYEAR]))
-        print("Month: {}".format(lParts[self.__cMONTH]))
-        print("Day: {}".format(lParts[self.__cDAY]))
-        print("Timestamp: {}".format(datetime.fromtimestamp((float(lParts[self.__cEPOCH_TIME])))))
+    def __print_study_filename_record(self, l_record: StudyFileRecord) -> None:
+        print()
+        Printer.print("Filename: {}".format(l_record.filename), Level.INFO)
+        Printer.print("Year: {}".format(l_record.year), Level.INFO)
+        Printer.print("Month: {}".format(l_record.month), Level.INFO)
+        Printer.print("Day: {}".format(l_record.day), Level.INFO)
+        Printer.print("Timestamp: {}".format(l_record.timestamp_string), Level.INFO)
+        Printer.print("Protocol: {}".format(l_record.protocol), Level.INFO)
+        Printer.print("Port: {}".format(l_record.port), Level.INFO)
 
-        l_protocol_port = lParts[self.__cFILESET].rsplit('_', self.__cLAST_OCCURENCE)
-        if l_protocol_port.__len__() == 2 and str.isdigit(l_protocol_port[1]):
-            Printer.print("Protocol: {}".format(l_protocol_port[0]), Level.INFO)
-            Printer.print("Port: {}".format(l_protocol_port[1]), Level.INFO)
-        elif l_protocol_port.__len__() == 2:
-            Printer.print("Protocol: {} {}".format(l_protocol_port[0], l_protocol_port[1]), Level.INFO)
-        elif l_protocol_port.__len__() == 1:
-            Printer.print("Protocol: {}".format(l_protocol_port[0]), Level.INFO)
-        else:
-            Printer.print("Unexpected format: {}".format(l_protocol_port), Level.WARNING)
+    def __parse_study_filename(self, p_study: str, p_filename: str) -> StudyFileRecord:
 
+        l_record = StudyFileRecord()
+        l_parts = p_filename.split('.')[0].split('-')
 
+        try:
+            l_record.study_uniqid = p_study
+            l_record.filename = p_filename
+            l_record.year = l_parts[self.__cYEAR]
+            l_record.month = l_parts[self.__cMONTH]
+            l_record.day = l_parts[self.__cDAY]
+            l_record.timestamp = l_parts[self.__cEPOCH_TIME]
+            l_record.timestamp_string = datetime.fromtimestamp((float(l_parts[self.__cEPOCH_TIME])))
+
+            l_protocol_port = l_parts[self.__cFILESET].rsplit('_', self.__cLAST_OCCURENCE)
+            if l_protocol_port.__len__() == 2 and str.isdigit(l_protocol_port[1]):
+                l_record.protocol = l_protocol_port[0]
+                l_record.port =l_protocol_port[1]
+            elif l_protocol_port.__len__() == 2:
+                l_record.protocol = "".format(l_protocol_port[0], l_protocol_port[1])
+                l_record.port = -1
+            elif l_protocol_port.__len__() == 1:
+                l_record.protocol = l_protocol_port[0]
+                l_record.port = -1
+            else:
+                Printer.print("Unexpected format: {}".format(l_protocol_port), Level.WARNING)
+
+            self.__print_study_filename_record(l_record)
+            return l_record
+        except IndexError as l_index_error:
+            l_record = None
+            Printer.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
 
     # ---------------------------------
     # public instance methods
@@ -191,13 +214,17 @@ class Sonar:
 
         self.__initialize_database()
         l_studies: list = self.__get_studies()
+        l_records = []
 
         for l_study in l_studies:
             if self.__study_is_interesting(l_study):
                 self.__print_study_metadata(l_study)
                 for l_filename in l_study['sonarfile_set']:
-                    self.__parse_study_filename(l_filename)
+                    l_record: StudyFileRecord = self.__parse_study_filename(l_study['uniqid'], l_filename)
+                    if l_record:
+                        l_records.append((l_record.study_uniqid, l_record.filename, l_record.year, l_record.month, l_record.day, l_record.timestamp, l_record.timestamp_string, l_record.protocol, l_record.port))
 
+        SQLite.insert_study_file_records(l_records)
     # ---------------------------------
     # public static class methods
     # ---------------------------------

@@ -8,13 +8,20 @@ import argparse
 
 def run_main_program():
 
+    Printer.verbose = Parser.verbose
+    Printer.debug = Parser.debug
+    Printer.log_filename = Parser.log_filename
+    Printer.log_level = Parser.log_level
+    Printer.log_max_bytes_per_file = Parser.log_max_bytes_per_file
+    Printer.log_max_number_log_files = Parser.log_max_number_log_files
+    Printer.log_format = Parser.log_format
+    Printer.enable_logging()
+
     if Parser.show_examples:
         Printer.print_example_usage()
         exit(0)
 
     lSonar = Sonar(p_parser=Parser)
-    Printer.verbose = Parser.verbose
-    Printer.debug = Parser.debug
 
     if Parser.test_connectivity:
         lSonar.test_connectivity()

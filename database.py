@@ -4,6 +4,17 @@ from printer import Printer, Level
 from urllib.request import pathname2url
 from enum import Enum
 
+class StudyFileRecord():
+    study_uniqid: str = ""
+    filename: str = ""
+    year: int = 0
+    month: int = 0
+    day: int = 0
+    timestamp: int = 0
+    timestamp_string: str = ""
+    protocol: str = ""
+    port: int = 0
+
 class Mode(Enum):
     READ_ONLY = 'ro'
     READ_WRITE = 'rw'
@@ -71,6 +82,34 @@ class SQLite():
         except sqlite3.Error as l_error:
             Printer.print("Error connecting to database: {}".format(l_error), Level.WARNING)
             return False
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
+    def insert_study_file_records(l_records: list):
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Inserting study file records", Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_query: str = "INSERT OR IGNORE INTO main.study_files(" \
+                           "study_uniqid," \
+                           "filename," \
+                           "year," \
+                           "month," \
+                           "day," \
+                           "timestamp," \
+                           "timestamp_string," \
+                           "protocol," \
+                           "port" \
+                           ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            l_cursor: sqlite3.Cursor = l_connection.cursor()
+            l_cursor.executemany(l_query, l_records)
+            l_connection.commit()
+
+        except sqlite3.Error as l_error:
+            Printer.print("Error inserting study file records: {}".format(l_error), Level.WARNING)
         finally:
             if l_connection:
                 l_connection.close()

@@ -12,6 +12,12 @@ class Parser:
     rapid7_open_api_key_file_path: str = ""
     studies_of_interest: list = []
     database_filename: str = ""
+    enable_logging: bool = False
+    log_filename: str = ""
+    log_max_bytes_per_file: int = 0
+    log_max_number_log_files: int = 0
+    log_level: int = 0
+    log_format: str = ""
 
     # static methods
     @staticmethod
@@ -26,3 +32,9 @@ class Parser:
         Parser.rapid7_open_api_key_file_path = p_config.RAPID7_OPEN_API_KEY_FILE_PATH
         Parser.studies_of_interest = p_config.STUDIES_OF_INTEREST
         Parser.database_filename = p_config.DATABASE_FILENAME
+        Parser.enable_logging = p_config.LOG_ENABLE_LOGGING
+        Parser.log_filename = p_config.LOG_FILENAME
+        Parser.log_max_bytes_per_file = p_config.LOG_MAX_BYTES_PER_FILE
+        Parser.log_max_number_log_files = p_config.LOG_MAX_NUMBER_LOG_FILES
+        Parser.log_level = p_config.LOG_LEVEL
+        Parser.log_format = p_config.LOG_FORMAT
