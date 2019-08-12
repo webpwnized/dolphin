@@ -31,6 +31,7 @@ class Sonar:
     __mVerbose: bool = False
     __mAPIKeyFile:str = ""
     __mStudiesOfInterest: list = []
+    __m_days_until_study_too_old: int = 0
     __mPrinter: Printer = Printer
 
     # ---------------------------------
@@ -88,6 +89,7 @@ class Sonar:
         self.__mPrinter.debug = Parser.debug
         self.__mAPIKeyFile = Parser.rapid7_open_api_key_file_path
         self.__mStudiesOfInterest = Parser.studies_of_interest
+        self.__m_days_until_study_too_old = Parser.days_until_study_too_old
         SQLite.database_filename = Parser.database_filename
         self.__parse_api_key()
 
@@ -211,20 +213,38 @@ class Sonar:
                 self.__print_study_metadata(l_study)
 
     def update_studies(self) -> None:
+        PROTOCOL = 6
+        PORT = 7
 
         self.__initialize_database()
         l_studies: list = self.__get_studies()
-        l_records = []
+        l_interesting_files = []
+        l_protocols_already_parsed: list = []
 
         for l_study in l_studies:
             if self.__study_is_interesting(l_study):
                 self.__print_study_metadata(l_study)
                 for l_filename in l_study['sonarfile_set']:
-                    l_record: StudyFileRecord = self.__parse_study_filename(l_study['uniqid'], l_filename)
-                    if l_record:
-                        l_records.append((l_record.study_uniqid, l_record.filename, l_record.year, l_record.month, l_record.day, l_record.timestamp, l_record.timestamp_string, l_record.protocol, l_record.port))
+                    l_sf_record: StudyFileRecord = self.__parse_study_filename(l_study['uniqid'], l_filename)
+                    if l_sf_record:
+                        l_interesting_files.append((l_sf_record.study_uniqid, l_sf_record.filename, l_sf_record.year, l_sf_record.month, l_sf_record.day, l_sf_record.timestamp, l_sf_record.timestamp_string, l_sf_record.protocol, l_sf_record.port))
 
-        SQLite.insert_study_file_records(l_records)
+        SQLite.insert_study_file_records(l_interesting_files)
+        SQLite.update_obsolete_study_file_records(self.__m_days_until_study_too_old)
+        l_usf_records: list = SQLite.get_unparsed_study_file_records()
+
+        for l_usf_record in l_usf_records:
+            l_protocol = "{}_{}".format(l_usf_record[PROTOCOL], l_usf_record[PORT])
+            if l_protocol not in l_protocols_already_parsed:
+                l_protocols_already_parsed.append(l_protocol)
+                print(l_usf_record)
+
+        print(len(l_usf_records))
+        print(len(l_protocols_already_parsed))
+
+
+
+
     # ---------------------------------
     # public static class methods
     # ---------------------------------

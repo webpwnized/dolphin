@@ -4,6 +4,7 @@ DATABASE_FILENAME = "dolphin.sqlite"
 
 RAPID7_OPEN_API_KEY_FILE_PATH = "rapid7-open-api.key"
 STUDIES_OF_INTEREST = ['sonar.tcp','sonar.udp']
+DAYS_UNTIL_STUDY_TOO_OLD = 60
 
 LOG_ENABLE_LOGGING = True
 LOG_FILENAME = "dolphin.log"

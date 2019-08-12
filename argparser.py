@@ -11,6 +11,7 @@ class Parser:
     update_studies: bool = False
     rapid7_open_api_key_file_path: str = ""
     studies_of_interest: list = []
+    days_until_study_too_old: int = 0
     database_filename: str = ""
     enable_logging: bool = False
     log_filename: str = ""
@@ -38,3 +39,5 @@ class Parser:
         Parser.log_max_number_log_files = p_config.LOG_MAX_NUMBER_LOG_FILES
         Parser.log_level = p_config.LOG_LEVEL
         Parser.log_format = p_config.LOG_FORMAT
+        Parser.days_until_study_too_old = p_config.DAYS_UNTIL_STUDY_TOO_OLD
+
