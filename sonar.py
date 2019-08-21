@@ -196,11 +196,11 @@ class Sonar:
             Printer.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
 
     def __format_file_size(self, p_file_size_bytes: int, p_suffix: str = 'B'):
+        l_file_size: str = ""
         for l_unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
             if abs(p_file_size_bytes) < 1024.0:
-                return "%3.1f%s %s" % (p_file_size_bytes, l_unit, p_suffix)
+                return "{} {}{}".format(round(p_file_size_bytes,2), l_unit, p_suffix)
             p_file_size_bytes /= 1024.0
-        return "%.1f%s%s" % (p_file_size_bytes, 'Yi', p_suffix)
 
     def __get_study_file_information(self, p_study: str, p_filname: str) -> dict:
         # Open Data API --> studies/<study unique ID>/<filename>
@@ -209,7 +209,6 @@ class Sonar:
         l_file_metadata_url: str = "{}{}/{}/".format(self.__cFILE_METADATA_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_file_metadata_url)
         l_file_metadata: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
-        l_value = self.__format_file_size(int(l_file_metadata["size"]))
         Printer.print("File {}: fingerprint {}, {} bytes, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
         return l_file_metadata
 
@@ -255,6 +254,8 @@ class Sonar:
         Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
         #TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
+        #TODO: Possibly calculate hash of downloaded file to make sure its legit
+        #TODO: log file format not what is expected
 
         return l_local_filename
 
