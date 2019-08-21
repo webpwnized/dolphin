@@ -3,7 +3,9 @@ from database import SQLite
 from database import StudyFileRecord
 import urllib.request
 import urllib.error
+import shutil
 import json
+import gzip
 from datetime import datetime
 from argparser import Parser
 
@@ -16,6 +18,8 @@ class Sonar:
     __cBASE_URL: str = "https://us.api.insight.rapid7.com/opendata/"
     __cQUOTA_URL: str = ''.join([__cBASE_URL, "quota/"])
     __cSTUDIES_URL: str = ''.join([__cBASE_URL, "studies/"])
+    __cFILE_METADATA_BASE_URL: str = ''.join([__cBASE_URL, "studies/"])
+    __cFILE_DOWNLOAD_BASE_URL: str = ''.join([__cBASE_URL, "studies/"])
     __SECONDS_PER_HOUR: int = 3600
     __cLAST_OCCURENCE: int = 1
     __cYEAR: int = 0
@@ -191,36 +195,42 @@ class Sonar:
             l_record = None
             Printer.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
 
-    # ---------------------------------
-    # public instance methods
-    # ---------------------------------
-    def test_connectivity(self) -> None:
-        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+    def __format_file_size(self, p_file_size_bytes: int, p_suffix: str = 'B'):
+        for l_unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
+            if abs(p_file_size_bytes) < 1024.0:
+                return "%3.1f%s %s" % (p_file_size_bytes, l_unit, p_suffix)
+            p_file_size_bytes /= 1024.0
+        return "%.1f%s%s" % (p_file_size_bytes, 'Yi', p_suffix)
 
-    def check_quota(self) -> None:
-        # Open Data API --> studies
-        # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
-        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
-        l_studies = json.loads(lHTTPResponse.read().decode('utf-8'))
-        Printer.print("{}/{} requests used in last {} hours".format(
-            l_studies['quota_used'],l_studies['quota_allowed'],int(int(l_studies['quota_timespan'])/self.__SECONDS_PER_HOUR)), Level.INFO
-        )
+    def __get_study_file_information(self, p_study: str, p_filname: str) -> dict:
+        # Open Data API --> studies/<study unique ID>/<filename>
+        # "name", "fingerprint", "size (bytes)", "updated_at"
+        Printer.print("Fetching metadata: study {}, file {}".format(p_study, p_filname), Level.INFO)
+        l_file_metadata_url: str = "{}{}/{}/".format(self.__cFILE_METADATA_BASE_URL, p_study, p_filname)
+        lHTTPResponse = self.__connect_to_open_data_api(l_file_metadata_url)
+        l_file_metadata: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_value = self.__format_file_size(int(l_file_metadata["size"]))
+        Printer.print("File {}: fingerprint {}, {} bytes, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
+        return l_file_metadata
 
-    def list_studies(self) -> None:
-        l_studies = self.__get_studies()
-        for l_study in l_studies:
-            if self.__study_is_interesting(l_study):
-                self.__print_study_metadata(l_study)
+    def __get_study_file_download_link(self, p_study: str, p_filname: str) -> str:
+        # Open Data API --> studies/<study unique ID>/<filename>/download/
+        # "url"
+        Printer.print("Fetching study file download link: study {}, file {}".format(p_study, p_filname), Level.INFO)
+        l_download_url: str = "{}{}/{}/download/".format(self.__cFILE_DOWNLOAD_BASE_URL, p_study, p_filname)
+        lHTTPResponse = self.__connect_to_open_data_api(l_download_url)
+        l_response: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_download_link: str = l_response['url']
+        Printer.print("Fetched download link for file {} from study {}: {}".format(p_filname, p_study, l_download_link), Level.SUCCESS)
+        return l_download_link
 
-    def update_studies(self) -> None:
-        PROTOCOL = 6
-        PORT = 7
-
-        self.__initialize_database()
+    def __get_available_sonar_files(self) -> list:
         l_studies: list = self.__get_studies()
         l_interesting_files = []
-        l_protocols_already_parsed: list = []
 
+        Printer.print("Checking if any interesting Sonar files are available for download", Level.INFO)
+
+        # if an interesting file is found in an interesting study, download the file metadata
         for l_study in l_studies:
             if self.__study_is_interesting(l_study):
                 self.__print_study_metadata(l_study)
@@ -229,21 +239,101 @@ class Sonar:
                     if l_sf_record:
                         l_interesting_files.append((l_sf_record.study_uniqid, l_sf_record.filename, l_sf_record.year, l_sf_record.month, l_sf_record.day, l_sf_record.timestamp, l_sf_record.timestamp_string, l_sf_record.protocol, l_sf_record.port))
 
+        return l_interesting_files
+
+    def __download_study_file(self, p_study, p_filename) -> str:
+        WRITE_BYTES: str = 'wb'
+
+        Printer.print("Downloading interesting study file: study {}, file {}".format(p_study, p_filename), Level.INFO)
+
+        l_file_information: dict = self.__get_study_file_information(p_study, p_filename)
+        l_download_link: str = self.__get_study_file_download_link(p_study, p_filename)
+        l_local_filename: str = "/tmp/{}".format(p_filename)
+        with urllib.request.urlopen(l_download_link) as l_http_response, open(l_local_filename, WRITE_BYTES) as l_output_file:
+           shutil.copyfileobj(l_http_response, l_output_file)
+
+        Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
+
+        #TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
+
+        return l_local_filename
+
+    # ---------------------------------
+    # public instance methods
+    # ---------------------------------
+    def test_connectivity(self) -> None:
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+
+    def check_quota(self) -> None:
+        # Open Data API --> quota
+        # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+        l_quota = json.loads(lHTTPResponse.read().decode('utf-8'))
+        Printer.print("{}/{} requests used in last {} hours".format(
+            l_quota['quota_used'],l_quota['quota_allowed'],int(int(l_quota['quota_timespan'])/self.__SECONDS_PER_HOUR)), Level.INFO
+        )
+
+    def list_studies(self) -> None:
+        l_studies = self.__get_studies()
+        for l_study in l_studies:
+            if self.__study_is_interesting(l_study):
+                self.__print_study_metadata(l_study)
+
+    def quota_exceeded(self) -> bool:
+        # Open Data API --> quota
+        # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
+        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+        l_quota = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_downloads_left = int(l_quota['quota_left'])
+        Printer.print("{} Rapid7 OpenData API requests left".format(l_downloads_left), Level.INFO)
+        return (l_downloads_left == 0)
+
+    def update_studies(self) -> None:
+        PROTOCOL = 6
+        PORT = 7
+        STUDY_UNIQUE_ID = 0
+        STUDY_FILENAME = 1
+        READ = 'r'
+
+        l_protocols_already_parsed: list = []
+        l_interesting_files: list = []
+
+        # if database not built, build database
+        self.__initialize_database()
+
+        # save file metadata, mark old files as obsolete and make a list of new files
+        l_interesting_files = self.__get_available_sonar_files()
         SQLite.insert_study_file_records(l_interesting_files)
         SQLite.update_obsolete_study_file_records(self.__m_days_until_study_too_old)
         l_usf_records: list = SQLite.get_unparsed_study_file_records()
 
+        # loop through available files but only use newest for any given protocol
         for l_usf_record in l_usf_records:
             l_protocol = "{}_{}".format(l_usf_record[PROTOCOL], l_usf_record[PORT])
             if l_protocol not in l_protocols_already_parsed:
+                # if file has new information about a protocol, download the file, parse out the data and delete the file
                 l_protocols_already_parsed.append(l_protocol)
-                print(l_usf_record)
+                if not self.quota_exceeded():
+                    # this stuff needs to go into a method self.__download_study_file()
+                    l_study_unique_id: str = l_usf_record[STUDY_UNIQUE_ID]
+                    l_study_filename: str = l_usf_record[STUDY_FILENAME]
+                    l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
+
+                    # TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
+
+                    # this stuff needs to go into method self.__parse_downloaded_study_file
+                    # this probably work better with zgrep or pigz
+                    # I need to solve the IP range search pattern problem
+                    with gzip.open(l_local_filename, READ) as l_file:
+                        for l_line in l_file:
+                            if ",153.2." in l_line.decode("ASCII"):
+                                print('got line', l_line)
+
+                else:
+                    raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time.")
 
         print(len(l_usf_records))
         print(len(l_protocols_already_parsed))
-
-
-
 
     # ---------------------------------
     # public static class methods
