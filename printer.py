@@ -44,6 +44,7 @@ class Printer:
     }
     __m_enable_logging: bool = False
     __m_logger: logging.Logger = None
+    __m_logger_initialized: bool = False
     __m_log_filename: str = ""
     __m_log_max_bytes_per_file: int = 0
     __m_log_max_number_log_files: int = 0
@@ -60,13 +61,6 @@ class Printer:
     @enable_logging.setter  # setter method
     def enable_logging(self: object, p_enable_logging: bool):
         self.__m_enable_logging = p_enable_logging
-        if self.__m_enable_logging:
-            self.__m_enable_logging = True
-            logging.basicConfig(filename=self.log_filename, format=self.log_format, level=self.log_level)
-            self.__m_logger = logging.getLogger(__name__)
-            l_handler = RotatingFileHandler(self.log_filename, maxBytes=self.log_max_bytes_per_file,
-                                            backupCount=self.log_max_number_log_files)
-            self.__m_logger.addHandler(l_handler)
 
     @property  # getter method
     def verbose(self) -> bool:
@@ -127,9 +121,15 @@ class Printer:
     # ---------------------------------
     # public instance constructor
     # ---------------------------------
-    #def __init__(self) -> None:
-    #    self.__mVerbose: bool = False
-    #    self.__mDebug: bool = False
+    def __init__(self) -> None:
+        logging.basicConfig(filename=self.log_filename, format=self.log_format, level=self.log_level)
+        l_handler = RotatingFileHandler(filename=self.log_filename, maxBytes=self.log_max_bytes_per_file,
+                                        backupCount=self.log_max_number_log_files)
+        l_handler.setLevel(self.log_level)
+        self.__m_logger = logging.getLogger(__name__)
+        self.__m_logger.addHandler(l_handler)
+        self.__m_logger.propagate = False
+        self.__m_logger_initialized = True
 
     # ---------------------------------
     # private instance methods
@@ -142,13 +142,22 @@ class Printer:
     # ---------------------------------
     # public static class methods
     # ---------------------------------
+
+    @staticmethod
+    def __initialize_logger__() -> None:
+        logging.basicConfig(filename=Printer.log_filename, format=Printer.log_format, level=Printer.log_level)
+        l_handler = RotatingFileHandler(filename=Printer.log_filename, maxBytes=Printer.log_max_bytes_per_file, backupCount=Printer.log_max_number_log_files)
+        l_handler.setLevel(Printer.log_level)
+        Printer.__m_logger = logging.getLogger(__name__)
+        Printer.__m_logger.addHandler(l_handler)
+        Printer.__m_logger.propagate = False
+        Printer.__m_logger_initialized = True
+
     @staticmethod
     def enable_logging():
         Printer.__m_enable_logging = True
-        logging.basicConfig(filename=Printer.log_filename, format=Printer.__m_log_format, level=Printer.log_level)
-        Printer.__m_logger = logging.getLogger(__name__)
-        l_handler = RotatingFileHandler(Printer.log_filename, maxBytes=Printer.log_max_bytes_per_file, backupCount=Printer.log_max_number_log_files)
-        Printer.__m_logger.addHandler(l_handler)
+        if not Printer.__m_logger_initialized:
+            Printer.__initialize_logger__()
 
     @staticmethod
     def disable_logging():
@@ -159,20 +168,23 @@ class Printer:
         # Only print INFO and SUCCESS messages if verbose is true
         # Only print DEBUG messages if debug is true
         # Warning, Error are always printed
-        if (pLevel in [Level.INFO, Level.SUCCESS]) and not Printer.verbose: return None
-        if (pLevel in [Level.DEBUG]) and not Printer.debug: return None
-        print("\033[1;{}m{}{}\033[21;0m".format(Printer.__mColorMap[pLevel], Printer.__mLevelMap[pLevel], pMessage))
-        if Printer.__m_enable_logging:
-            if pLevel == Level.DEBUG:
-                Printer.__m_logger.debug(pMessage)
-            elif (pLevel in [Level.INFO, Level.SUCCESS]):
-                Printer.__m_logger.info(pMessage)
-            elif pLevel == Level.WARNING:
-                Printer.__m_logger.warning(pMessage)
-            elif pLevel == Level.ERROR:
-                Printer.__m_logger.error(pMessage)
-            elif pLevel == Level.CRITICAL:
-                Printer.__m_logger.critical(pMessage)
+        try:
+            if (pLevel in [Level.INFO, Level.SUCCESS]) and not Printer.verbose: return None
+            if (pLevel in [Level.DEBUG]) and not Printer.debug: return None
+            print("\033[1;{}m{}{}\033[21;0m".format(Printer.__mColorMap[pLevel], Printer.__mLevelMap[pLevel], pMessage))
+            if Printer.__m_enable_logging:
+                if pLevel == Level.DEBUG:
+                    Printer.__m_logger.debug(pMessage)
+                elif pLevel in [Level.INFO, Level.SUCCESS]:
+                    Printer.__m_logger.info(pMessage)
+                elif pLevel == Level.WARNING:
+                    Printer.__m_logger.warning(pMessage)
+                elif pLevel == Level.ERROR:
+                    Printer.__m_logger.error(pMessage)
+                elif pLevel == Level.CRITICAL:
+                    Printer.__m_logger.critical(pMessage)
+        except Exception as e:
+            print(e)
 
     @staticmethod
     def print_example_usage():

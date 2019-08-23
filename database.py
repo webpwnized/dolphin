@@ -226,6 +226,28 @@ class SQLite():
                 l_connection.close()
 
     @staticmethod
+    def update_parsed_study_file_record(p_filename: str):
+        l_connection: sqlite3.Connection = None
+        l_now: int = int(time.mktime(time.localtime()))
+
+        try:
+            Printer.print("Updating parsed study file record", Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_query: str = "UPDATE OR IGNORE main.study_files " \
+                           "SET parsed = 'Y'," \
+                               "parsed_timestamp = '{}'," \
+                               "parsed_timestamp_string = datetime('{}', 'unixepoch', 'localtime') " \
+                           "WHERE " \
+                                "filename = '{}';".format(l_now, l_now, p_filename)
+            SQLite.__execute_query(l_connection, l_query)
+
+        except sqlite3.Error as l_error:
+            Printer.print("Error updating parsed study file record: {}".format(l_error), Level.WARNING)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
     def create_database() -> None:
         l_connection:sqlite3.Connection = None
         try:

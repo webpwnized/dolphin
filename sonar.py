@@ -8,6 +8,7 @@ import json
 import gzip
 from datetime import datetime
 from argparser import Parser
+import os
 
 class Sonar:
 
@@ -154,13 +155,7 @@ class Sonar:
 
     def __print_study_filename_record(self, l_record: StudyFileRecord) -> None:
         print()
-        Printer.print("Filename: {}".format(l_record.filename), Level.INFO)
-        Printer.print("Year: {}".format(l_record.year), Level.INFO)
-        Printer.print("Month: {}".format(l_record.month), Level.INFO)
-        Printer.print("Day: {}".format(l_record.day), Level.INFO)
-        Printer.print("Timestamp: {}".format(l_record.timestamp_string), Level.INFO)
-        Printer.print("Protocol: {}".format(l_record.protocol), Level.INFO)
-        Printer.print("Port: {}".format(l_record.port), Level.INFO)
+        Printer.print("Filename: {}, Protocol: {}, Port:{}, Timestamp: {}".format(l_record.filename,l_record.protocol,l_record.port,l_record.timestamp_string), Level.INFO)
 
     def __parse_study_filename(self, p_study: str, p_filename: str) -> StudyFileRecord:
 
@@ -255,9 +250,14 @@ class Sonar:
 
         #TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
         #TODO: Possibly calculate hash of downloaded file to make sure its legit
-        #TODO: log file format not what is expected
 
         return l_local_filename
+
+    def __delete_study_file(self, p_local_filename: str) -> None:
+        try:
+            os.remove(p_local_filename)
+        except OSError:
+            pass
 
     # ---------------------------------
     # public instance methods
@@ -320,8 +320,6 @@ class Sonar:
                     l_study_filename: str = l_usf_record[STUDY_FILENAME]
                     l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
 
-                    # TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
-
                     # this stuff needs to go into method self.__parse_downloaded_study_file
                     # this probably work better with zgrep or pigz
                     # I need to solve the IP range search pattern problem
@@ -329,6 +327,12 @@ class Sonar:
                         for l_line in l_file:
                             if ",153.2." in l_line.decode("ASCII"):
                                 print('got line', l_line)
+                                # parse the record
+                                # insert the record
+
+                    SQLite.update_parsed_study_file_record(l_study_filename)
+                    self.__delete_study_file(l_local_filename)
+
 
                 else:
                     raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time.")
