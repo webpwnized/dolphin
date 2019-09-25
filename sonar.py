@@ -9,6 +9,7 @@ import gzip
 from datetime import datetime
 from argparser import Parser
 import os
+import time
 
 class Sonar:
 
@@ -38,10 +39,19 @@ class Sonar:
     __mStudiesOfInterest: list = []
     __m_days_until_study_too_old: int = 0
     __mPrinter: Printer = Printer
+    __mOrganizations: list = []
 
     # ---------------------------------
     # "Public" class variables
     # ---------------------------------
+    @property  # getter method
+    def organizations(self) -> list:
+        return self.__mOrganizations
+
+    @organizations.setter  # setter method
+    def organizations(self: object, p_organizations: list):
+        self.__mOrganizations = p_organizations
+
     @property  # getter method
     def verbose(self) -> bool:
         return self.__mVerbose
@@ -95,7 +105,9 @@ class Sonar:
         self.__mAPIKeyFile = Parser.rapid7_open_api_key_file_path
         self.__mStudiesOfInterest = Parser.studies_of_interest
         self.__m_days_until_study_too_old = Parser.days_until_study_too_old
+        self.__organizations = Parser.organizations
         SQLite.database_filename = Parser.database_filename
+        self.organizations = Parser.organizations
         self.__parse_api_key()
 
     # ---------------------------------
@@ -190,6 +202,39 @@ class Sonar:
             l_record = None
             Printer.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
 
+    def __parse_protocol_line(self, p_study_file_line: str, p_organization: dict, p_study_file_record: list) -> tuple:
+        # Discovered Service
+        # "ipv4_address,"
+        # "port,"
+        # "protocol,"
+        # "study_uniqid,"
+        # "filename,"
+        # "organization_name TEXT,"
+        # "ip_address_range TEXT,"
+        # "additional_notes TEXT,"
+        # "discovered_timestamp,"
+        # "discovered_timestamp_string,"
+        # "parsed_timestamp,"
+        # "parsed_timestamp_string"
+
+        STUDY_FILE_LINE_TIMESTAMP_TS = 0
+        STUDY_FILE_LINE_SADDR = 1
+        STUDY_FILE_LINE_SPORT = 2
+
+        STUDY_FILE_RECORD_STUDY_UNIQUE_ID = 0
+        STUDY_FILE_RECORD_STUDY_FILENAME = 1
+        STUDY_FILE_RECORD_PROTOCOL = 6
+
+        l_now: int = int(time.mktime(time.localtime()))
+        l_fields: list = p_study_file_line.split(",")
+        l_record: tuple = (l_fields[STUDY_FILE_LINE_SADDR], l_fields[STUDY_FILE_LINE_SPORT],
+                           p_study_file_record[STUDY_FILE_RECORD_PROTOCOL], p_study_file_record[STUDY_FILE_RECORD_STUDY_UNIQUE_ID],
+                           p_study_file_record[STUDY_FILE_RECORD_STUDY_FILENAME], p_organization["organization_name"],
+                           p_organization["ip_address_range"], p_organization["additional_notes"],
+                           l_fields[STUDY_FILE_LINE_TIMESTAMP_TS], l_fields[STUDY_FILE_LINE_TIMESTAMP_TS], l_now, l_now)
+
+        return l_record
+
     def __format_file_size(self, p_file_size_bytes: int, p_suffix: str = 'B'):
         l_file_size: str = ""
         for l_unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
@@ -259,6 +304,21 @@ class Sonar:
         except OSError:
             pass
 
+    def __index_search_patterns(self) -> dict:
+        # In this space for time trade-off, organization records are indexed by search pattern
+        # In the organizations dictionary, organizations are indexed by "index". In this new
+        # dictionary "l_indexed_search_patterns", the index is the search pattern and the
+        # value is the "index" field from the organizations dictionary. If a match is found
+        # on a search pattern, it will be easy to retrieve the meta-data about the organization.
+        l_indexed_search_patterns: dict = {}
+        for l_organization in self.__mOrganizations:
+            for l_search_pattern in l_organization['search_patterns']:
+                #The comma is added before the search pattern because the records from Rapid7 are CSV format
+                # i.e. to search for 10.20.30.0/24 we need to search for and record with ",10.20.30"
+                l_indexed_search_patterns.update({'{}{}'.format(',',l_search_pattern): l_organization['index']})
+
+        return l_indexed_search_patterns
+
     # ---------------------------------
     # public instance methods
     # ---------------------------------
@@ -297,48 +357,57 @@ class Sonar:
         READ = 'r'
 
         l_protocols_already_parsed: list = []
-        l_interesting_files: list = []
+        l_discovered_service_records: list = []
 
         # if database not built, build database
         self.__initialize_database()
 
-        # save file metadata, mark old files as obsolete and make a list of new files
-        l_interesting_files = self.__get_available_sonar_files()
-        SQLite.insert_study_file_records(l_interesting_files)
+        # re-organize the search patterns into a dictionary
+        l_indexed_search_patterns: dict = self.__index_search_patterns()
+
+        # save file metadata, mark old files as obsolete and fetch a list of new files
+        l_interesting_files: list = self.__get_available_sonar_files()
+        SQLite.insert_new_study_file_records(l_interesting_files)
         SQLite.update_obsolete_study_file_records(self.__m_days_until_study_too_old)
         l_usf_records: list = SQLite.get_unparsed_study_file_records()
 
         # loop through available files but only use newest for any given protocol
         for l_usf_record in l_usf_records:
-            l_protocol = "{}_{}".format(l_usf_record[PROTOCOL], l_usf_record[PORT])
-            if l_protocol not in l_protocols_already_parsed:
+            l_study_filename: str = l_usf_record[STUDY_FILENAME]
+            l_protocol: str = l_usf_record[PROTOCOL]
+            #l_protocol_id: str = "{}_{}".format(l_protocol, l_usf_record[PORT])
+            l_protocol_id: str = "ssh_22"
+
+            if l_protocol_id in l_protocols_already_parsed:
+                SQLite.update_outdated_study_file_record(l_study_filename)
+            else:
                 # if file has new information about a protocol, download the file, parse out the data and delete the file
-                l_protocols_already_parsed.append(l_protocol)
+                l_protocols_already_parsed.append(l_protocol_id)
                 if not self.quota_exceeded():
-                    # this stuff needs to go into a method self.__download_study_file()
                     l_study_unique_id: str = l_usf_record[STUDY_UNIQUE_ID]
-                    l_study_filename: str = l_usf_record[STUDY_FILENAME]
-                    l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
+                    #l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
+                    l_local_filename: str = "/home/jeremy/Documents/dolphin/2019-08-22-1566507656-ssh_22.csv.gz"
 
                     # this stuff needs to go into method self.__parse_downloaded_study_file
                     # this probably work better with zgrep or pigz
                     # I need to solve the IP range search pattern problem
                     with gzip.open(l_local_filename, READ) as l_file:
                         for l_line in l_file:
-                            if ",153.2." in l_line.decode("ASCII"):
-                                print('got line', l_line)
-                                # parse the record
-                                # insert the record
+                            l_decoded_line = l_line.decode("ASCII")
+                            for l_search_pattern in l_indexed_search_patterns:
+                                if l_search_pattern in l_decoded_line:
+                                    l_discovered_service_record: tuple = self.__parse_protocol_line(l_decoded_line,
+                                                                    self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
+                                                                    l_usf_record)
+                                    l_discovered_service_records.append(l_discovered_service_record)
 
+                    SQLite.insert_discovered_service_records(l_discovered_service_records)
                     SQLite.update_parsed_study_file_record(l_study_filename)
                     self.__delete_study_file(l_local_filename)
 
-
                 else:
-                    raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time.")
+                    raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time. Dont worry. I keep track. Ill get them next time.")
 
-        print(len(l_usf_records))
-        print(len(l_protocols_already_parsed))
 
     # ---------------------------------
     # public static class methods

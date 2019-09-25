@@ -9,4 +9,5 @@ None
 
 ## References
 
+* [Rapid7 Open Data Documentation](https://opendata.rapid7.com/about/)
 * [Rapid7 Open Data API Documentation](https://opendata.rapid7.com/apihelp/)

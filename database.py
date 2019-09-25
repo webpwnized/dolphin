@@ -120,7 +120,12 @@ class SQLite():
                        "parsed," \
                        "parsed_description" \
                        ") VALUES ('I', 'In progress');"
-        l_cursor: sqlite3.Cursor = p_connection.cursor()
+        SQLite.__execute_query(p_connection, l_query)
+
+        l_query: str = "INSERT OR IGNORE INTO main.parse_status(" \
+                       "parsed," \
+                       "parsed_description" \
+                       ") VALUES ('O', 'Outdated file');"
         SQLite.__execute_query(p_connection, l_query)
 
         Printer.print("Created table parse_status", Level.SUCCESS)
@@ -129,23 +134,46 @@ class SQLite():
     def __create_study_files_table(p_connection: sqlite3.Connection) -> None:
 
         l_query: str = "CREATE TABLE IF NOT EXISTS main.study_files(" \
-                       "study_uniqid TEXT," \
-                       "filename TEXT PRIMARY KEY," \
-                       "year INTEGER," \
-                       "month INTEGER," \
-                       "day INTEGER," \
-                       "timestamp INTEGER," \
-                       "timestamp_string TEXT," \
-                       "protocol TEXT," \
-                       "port INTEGER," \
-                       "parsed TEXT DEFAULT 'N' NOT NULL," \
-                       "parsed_timestamp INTEGER," \
-                       "parsed_timestamp_string TEXT," \
-                       "FOREIGN KEY(parsed) REFERENCES parse_status(parsed)" \
+                           "study_uniqid TEXT," \
+                           "filename TEXT PRIMARY KEY," \
+                           "year INTEGER," \
+                           "month INTEGER," \
+                           "day INTEGER," \
+                           "timestamp INTEGER," \
+                           "timestamp_string TEXT," \
+                           "protocol TEXT," \
+                           "port INTEGER," \
+                           "parsed TEXT DEFAULT 'N' NOT NULL," \
+                           "parsed_timestamp INTEGER," \
+                           "parsed_timestamp_string TEXT," \
+                           "FOREIGN KEY(parsed) REFERENCES parse_status(parsed)" \
                        ");"
         Printer.print("Creating table study_files", Level.INFO)
         SQLite.__execute_query(p_connection, l_query)
         Printer.print("Created table study_files", Level.SUCCESS)
+
+    @staticmethod
+    def __create_discovered_services_table(p_connection: sqlite3.Connection) -> None:
+
+        l_query: str = "CREATE TABLE IF NOT EXISTS main.discovered_services(" \
+                            "ipv4_address TEXT," \
+                            "port INTEGER," \
+                            "protocol TEXT," \
+                            "study_uniqid TEXT," \
+                            "filename TEXT," \
+                            "organization_name TEXT," \                      
+                            "ip_address_range TEXT," \
+                            "additional_notes TEXT," \
+                            "discovered_timestamp INTEGER," \
+                            "discovered_timestamp_string TEXT," \
+                            "parsed_timestamp INTEGER," \
+                            "parsed_timestamp_string TEXT," \
+                            "PRIMARY KEY(ipv4_address, port)" \
+                       ");"
+
+        Printer.print("Creating table discovered_services", Level.INFO)
+        SQLite.__execute_query(p_connection, l_query)
+        Printer.print("Created table discovered_services", Level.SUCCESS)
 
     @staticmethod
     def get_unparsed_study_file_records() -> list:
@@ -175,29 +203,65 @@ class SQLite():
                 l_connection.close()
 
     @staticmethod
-    def insert_study_file_records(l_records: list):
+    def insert_new_study_file_records(p_records: list):
         l_connection:sqlite3.Connection = None
 
         try:
             Printer.print("Inserting study file records", Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
             l_query: str = "INSERT OR IGNORE INTO main.study_files(" \
-                           "study_uniqid," \
-                           "filename," \
-                           "year," \
-                           "month," \
-                           "day," \
-                           "timestamp," \
-                           "timestamp_string," \
-                           "protocol," \
-                           "port" \
+                               "study_uniqid," \
+                               "filename," \
+                               "year," \
+                               "month," \
+                               "day," \
+                               "timestamp," \
+                               "timestamp_string," \
+                               "protocol," \
+                               "port" \
                            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
             l_cursor: sqlite3.Cursor = l_connection.cursor()
-            l_cursor.executemany(l_query, l_records)
+            l_cursor.executemany(l_query, p_records)
             l_connection.commit()
 
+        except sqlite3.OperationalError as l_op_error:
+            Printer.print("Error inserting unparsed study file records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:
-            Printer.print("Error inserting unparsed study file records: {}".format(l_error), Level.WARNING)
+            Printer.print("Error inserting unparsed study file records: {}".format(l_error), Level.ERROR)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
+    def insert_discovered_service_records(p_records: list):
+        # timestamp_ts, saddr, sport, daddr, dport, ipid, ttl
+
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Inserting discovered service records", Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_query: str = "INSERT OR IGNORE INTO main.discovered_services(" \
+                            "ipv4_address," \
+                            "port," \
+                            "protocol," \
+                            "study_uniqid," \
+                            "filename," \
+                            "organization_name TEXT," \
+                            "ip_address_range TEXT," \
+                            "additional_notes TEXT," \
+                            "discovered_timestamp," \
+                            "discovered_timestamp_string," \
+                            "parsed_timestamp," \
+                            "parsed_timestamp_string" \
+                           ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(?, 'unixepoch', 'localtime'), ?, datetime(?, 'unixepoch', 'localtime'))"
+            l_cursor: sqlite3.Cursor = l_connection.cursor()
+            l_cursor.executemany(l_query, p_records)
+            l_connection.commit()
+        except sqlite3.OperationalError as l_op_error:
+            Printer.print("Error inserting discovered service records: {}".format(l_op_error), Level.ERROR)
+        except sqlite3.Error as l_error:
+            Printer.print("Error inserting discovered service records: {}".format(l_error), Level.ERROR)
         finally:
             if l_connection:
                 l_connection.close()
@@ -248,6 +312,28 @@ class SQLite():
                 l_connection.close()
 
     @staticmethod
+    def update_outdated_study_file_record(p_filename: str):
+        l_connection: sqlite3.Connection = None
+        l_now: int = int(time.mktime(time.localtime()))
+
+        try:
+            Printer.print("Updating outdated study file record", Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_query: str = "UPDATE OR IGNORE main.study_files " \
+                           "SET parsed = 'O'," \
+                               "parsed_timestamp = '{}'," \
+                               "parsed_timestamp_string = datetime('{}', 'unixepoch', 'localtime') " \
+                           "WHERE " \
+                                "filename = '{}';".format(l_now, l_now, p_filename)
+            SQLite.__execute_query(l_connection, l_query)
+
+        except sqlite3.Error as l_error:
+            Printer.print("Error updating outdated study file record: {}".format(l_error), Level.WARNING)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
     def create_database() -> None:
         l_connection:sqlite3.Connection = None
         try:
@@ -258,6 +344,7 @@ class SQLite():
             SQLite.__enable_foreign_keys(l_connection)
             SQLite.__create_parse_status_table(l_connection)
             SQLite.__create_study_files_table(l_connection)
+            SQLite.__create_discovered_services_table(l_connection)
 
         # study-uniqid, filename (PK), year, month, day, timestamp, protocol, port, parsed="N"
 

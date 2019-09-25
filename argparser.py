@@ -19,6 +19,7 @@ class Parser:
     log_max_number_log_files: int = 0
     log_level: int = 0
     log_format: str = ""
+    organizations: list = []
 
     # static methods
     @staticmethod
@@ -40,4 +41,5 @@ class Parser:
         Parser.log_level = p_config.LOG_LEVEL
         Parser.log_format = p_config.LOG_FORMAT
         Parser.days_until_study_too_old = p_config.DAYS_UNTIL_STUDY_TOO_OLD
+        Parser.organizations = p_config.ORGANIZATIONS
 
