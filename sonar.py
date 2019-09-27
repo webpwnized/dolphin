@@ -10,6 +10,7 @@ from datetime import datetime
 from argparser import Parser
 import os
 import time
+import re
 
 class Sonar:
 
@@ -293,13 +294,13 @@ class Sonar:
 
         Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
-        #TODO: Keep track of files that are downloaded and parsed so we dont download them again in the future
         #TODO: Possibly calculate hash of downloaded file to make sure its legit
 
         return l_local_filename
 
     def __delete_study_file(self, p_local_filename: str) -> None:
         try:
+            Printer.print("Deleting file to {}".format(p_local_filename), Level.SUCCESS)
             os.remove(p_local_filename)
         except OSError:
             pass
@@ -310,12 +311,16 @@ class Sonar:
         # dictionary "l_indexed_search_patterns", the index is the search pattern and the
         # value is the "index" field from the organizations dictionary. If a match is found
         # on a search pattern, it will be easy to retrieve the meta-data about the organization.
+        Printer.print("Indexing search patterns", Level.INFO)
         l_indexed_search_patterns: dict = {}
+        l_regexp = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
         for l_organization in self.__mOrganizations:
             for l_search_pattern in l_organization['search_patterns']:
                 #The comma is added before the search pattern because the records from Rapid7 are CSV format
                 # i.e. to search for 10.20.30.0/24 we need to search for and record with ",10.20.30"
-                l_indexed_search_patterns.update({'{}{}'.format(',',l_search_pattern): l_organization['index']})
+                # To search for full ip like 10.10.10.10, be sure to add the training comma i.e. ",10.10.10.10,"
+                l_trailing_comma = ',' if re.match(l_regexp, l_search_pattern) else ''
+                l_indexed_search_patterns.update({'{}{}{}'.format(',', l_search_pattern, l_trailing_comma): l_organization['index']})
 
         return l_indexed_search_patterns
 
@@ -359,6 +364,8 @@ class Sonar:
         l_protocols_already_parsed: list = []
         l_discovered_service_records: list = []
 
+        Printer.print("Fetching and parsing unparsed study files in search of network services", Level.INFO)
+
         # if database not built, build database
         self.__initialize_database()
 
@@ -375,8 +382,9 @@ class Sonar:
         for l_usf_record in l_usf_records:
             l_study_filename: str = l_usf_record[STUDY_FILENAME]
             l_protocol: str = l_usf_record[PROTOCOL]
-            #l_protocol_id: str = "{}_{}".format(l_protocol, l_usf_record[PORT])
-            l_protocol_id: str = "ssh_22"
+            l_protocol_id: str = "{}_{}".format(l_protocol, l_usf_record[PORT])
+
+            Printer.print("Parsing study {}".format(l_study_filename), Level.INFO)
 
             if l_protocol_id in l_protocols_already_parsed:
                 SQLite.update_outdated_study_file_record(l_study_filename)
@@ -385,12 +393,11 @@ class Sonar:
                 l_protocols_already_parsed.append(l_protocol_id)
                 if not self.quota_exceeded():
                     l_study_unique_id: str = l_usf_record[STUDY_UNIQUE_ID]
-                    #l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
-                    l_local_filename: str = "/home/jeremy/Documents/dolphin/2019-08-22-1566507656-ssh_22.csv.gz"
+                    l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
 
-                    # this stuff needs to go into method self.__parse_downloaded_study_file
-                    # this probably work better with zgrep or pigz
-                    # I need to solve the IP range search pattern problem
+                    # TODO: this stuff needs to go into method self.__parse_downloaded_study_file
+                    # TODO: this probably work better with zgrep or pigz
+                    # TODO: Have to find a faster parsing method
                     with gzip.open(l_local_filename, READ) as l_file:
                         for l_line in l_file:
                             l_decoded_line = l_line.decode("ASCII")
@@ -400,8 +407,10 @@ class Sonar:
                                                                     self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
                                                                     l_usf_record)
                                     l_discovered_service_records.append(l_discovered_service_record)
+                                    Printer.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
 
-                    SQLite.insert_discovered_service_records(l_discovered_service_records)
+                    if l_discovered_service_records:
+                        SQLite.insert_discovered_service_records(l_discovered_service_records)
                     SQLite.update_parsed_study_file_record(l_study_filename)
                     self.__delete_study_file(l_local_filename)
 

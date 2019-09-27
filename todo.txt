@@ -1,3 +1,25 @@
+DECODED LINE
+timestamp_ts
+saddr
+sport
+
+ORGANIZATION
+index
+organization_name
+ip_address_range
+search_patterns
+additional_notes
+
+STUDY FILE RECORD
+study_uniqid
+filename
+year
+month
+day
+timestamp
+protocol
+port
+
 
 Update the "last updated" date
 

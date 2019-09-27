@@ -161,7 +161,7 @@ class SQLite():
                             "protocol TEXT," \
                             "study_uniqid TEXT," \
                             "filename TEXT," \
-                            "organization_name TEXT," \                      
+                            "organization_name TEXT," \
                             "ip_address_range TEXT," \
                             "additional_notes TEXT," \
                             "discovered_timestamp INTEGER," \
@@ -247,9 +247,9 @@ class SQLite():
                             "protocol," \
                             "study_uniqid," \
                             "filename," \
-                            "organization_name TEXT," \
-                            "ip_address_range TEXT," \
-                            "additional_notes TEXT," \
+                            "organization_name," \
+                            "ip_address_range," \
+                            "additional_notes," \
                             "discovered_timestamp," \
                             "discovered_timestamp_string," \
                             "parsed_timestamp," \
@@ -317,7 +317,7 @@ class SQLite():
         l_now: int = int(time.mktime(time.localtime()))
 
         try:
-            Printer.print("Updating outdated study file record", Level.INFO)
+            Printer.print("Updating outdated study file record since newer study is available: {}".format(p_filename), Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
             l_query: str = "UPDATE OR IGNORE main.study_files " \
                            "SET parsed = 'O'," \
