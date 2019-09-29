@@ -11,6 +11,7 @@ from argparser import Parser
 import os
 import time
 import re
+import subprocess
 
 class Sonar:
 
@@ -360,6 +361,7 @@ class Sonar:
         STUDY_UNIQUE_ID = 0
         STUDY_FILENAME = 1
         READ = 'r'
+        APPEND = 'a'
 
         l_protocols_already_parsed: list = []
         l_discovered_service_records: list = []
@@ -398,12 +400,26 @@ class Sonar:
                     # TODO: this stuff needs to go into method self.__parse_downloaded_study_file
                     # TODO: this probably work better with zgrep or pigz
                     # TODO: Have to find a faster parsing method
-                    with gzip.open(l_local_filename, READ) as l_file:
-                        for l_line in l_file:
-                            l_decoded_line = l_line.decode("ASCII")
+                    # TODO: ZGREP LOOKS LIKE A GOOD CANDIDATE
+
+                    l_temp_filename = "/tmp/records"
+                    subprocess.call(["rm", l_temp_filename])
+                    subprocess.call(["touch", l_temp_filename])
+                    l_output_file = open(l_temp_filename, APPEND)
+                    l_number_patterns = len(l_indexed_search_patterns)
+                    Printer.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
+                    for l_index, l_search_pattern in enumerate(l_indexed_search_patterns, start=1):
+                        print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), end='')
+                        print('\r')
+                        subprocess.call(["zgrep", "-F", l_search_pattern,l_local_filename], stdout=l_output_file)
+                        l_output_file.flush()
+                    l_output_file.close()
+
+                    with open(l_temp_filename, READ) as l_temp_file:
+                        for l_line in l_temp_file:
                             for l_search_pattern in l_indexed_search_patterns:
-                                if l_search_pattern in l_decoded_line:
-                                    l_discovered_service_record: tuple = self.__parse_protocol_line(l_decoded_line,
+                                if l_search_pattern in l_line:
+                                    l_discovered_service_record: tuple = self.__parse_protocol_line(l_line,
                                                                     self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
                                                                     l_usf_record)
                                     l_discovered_service_records.append(l_discovered_service_record)

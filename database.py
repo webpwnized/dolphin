@@ -241,7 +241,7 @@ class SQLite():
         try:
             Printer.print("Inserting discovered service records", Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
-            l_query: str = "INSERT OR IGNORE INTO main.discovered_services(" \
+            l_query: str = "INSERT OR REPLACE INTO main.discovered_services(" \
                             "ipv4_address," \
                             "port," \
                             "protocol," \
