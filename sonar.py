@@ -1,17 +1,19 @@
 from printer import Printer, Level
 from database import SQLite
 from database import StudyFileRecord
+from studies import Studies
+from datetime import datetime
+from argparser import Parser
 import urllib.request
 import urllib.error
 import shutil
 import json
-import gzip
-from datetime import datetime
-from argparser import Parser
 import os
 import time
 import re
 import subprocess
+import csv
+import hashlib
 
 class Sonar:
 
@@ -42,10 +44,38 @@ class Sonar:
     __m_days_until_study_too_old: int = 0
     __mPrinter: Printer = Printer
     __mOrganizations: list = []
+    __m_export_data: bool = False
+    __m_type_of_data_to_export: Studies = None
+    __m_export_output_file: str = ""
 
     # ---------------------------------
     # "Public" class variables
     # ---------------------------------
+
+    @property  # getter method
+    def export_output_file(self) -> str:
+        return self.__m_export_output_file
+
+    @export_output_file.setter  # setter method
+    def export_output_file(self: object, p_export_output_file: str):
+        self.__m_export_output_file = p_export_output_file
+
+    @property  # getter method
+    def type_of_data_to_export(self) -> Studies:
+        return self.__m_type_of_data_to_export
+
+    @type_of_data_to_export.setter  # setter method
+    def type_of_data_to_export(self: object, p_type_of_data_to_export: Studies):
+        self.__m_type_of_data_to_export = p_type_of_data_to_export
+
+    @property  # getter method
+    def export_data(self) -> bool:
+        return self.__m_export_data
+
+    @export_data.setter  # setter method
+    def export_data(self: object, p_export_data: bool):
+        self.__m_export_data = p_export_data
+
     @property  # getter method
     def organizations(self) -> list:
         return self.__mOrganizations
@@ -107,9 +137,11 @@ class Sonar:
         self.__mAPIKeyFile = Parser.rapid7_open_api_key_file_path
         self.__mStudiesOfInterest = Parser.studies_of_interest
         self.__m_days_until_study_too_old = Parser.days_until_study_too_old
-        self.__organizations = Parser.organizations
+        self.__mOrganizations = Parser.organizations
         SQLite.database_filename = Parser.database_filename
-        self.organizations = Parser.organizations
+        self.__m_export_data = True if Parser.export_data else False
+        self.__m_type_of_data_to_export = Parser.type_of_data_to_export
+        self.__m_export_output_file = Parser.export_output_file
         self.__parse_api_key()
 
     # ---------------------------------
@@ -282,6 +314,20 @@ class Sonar:
 
         return l_interesting_files
 
+    def __verify_downloaded_file(self, p_local_filename: str, p_fingerprint: str) -> bool:
+        BLOCKSIZE = 65536
+        READ_BYTES = 'rb'
+
+        Printer.print("Verifying hash of downloaded study file {}".format(p_local_filename), Level.INFO)
+
+        l_hash_generator = hashlib.sha1()
+        with open(p_local_filename, READ_BYTES) as l_file:
+            buf = l_file.read(BLOCKSIZE)
+            while len(buf) > 0:
+                l_hash_generator.update(buf)
+                buf = l_file.read(BLOCKSIZE)
+        return l_hash_generator.hexdigest() == p_fingerprint
+
     def __download_study_file(self, p_study, p_filename) -> str:
         WRITE_BYTES: str = 'wb'
 
@@ -295,7 +341,9 @@ class Sonar:
 
         Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
-        #TODO: Possibly calculate hash of downloaded file to make sure its legit
+        if not self.__verify_downloaded_file(l_local_filename, l_file_information['fingerprint']):
+            Printer.print("Downloaded file failed hash verification: {}".format(p_filename),
+                          Level.ERROR)
 
         return l_local_filename
 
@@ -384,7 +432,8 @@ class Sonar:
         for l_usf_record in l_usf_records:
             l_study_filename: str = l_usf_record[STUDY_FILENAME]
             l_protocol: str = l_usf_record[PROTOCOL]
-            l_protocol_id: str = "{}_{}".format(l_protocol, l_usf_record[PORT])
+            l_port: int =  l_usf_record[PORT]
+            l_protocol_id: str = "{}_{}".format(l_protocol, l_port)
 
             Printer.print("Parsing study {}".format(l_study_filename), Level.INFO)
 
@@ -397,43 +446,47 @@ class Sonar:
                     l_study_unique_id: str = l_usf_record[STUDY_UNIQUE_ID]
                     l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
 
-                    # TODO: this stuff needs to go into method self.__parse_downloaded_study_file
-                    # TODO: this probably work better with zgrep or pigz
-                    # TODO: Have to find a faster parsing method
-                    # TODO: ZGREP LOOKS LIKE A GOOD CANDIDATE
+                    if l_study_unique_id == Studies.SONAR_TCP.value or l_study_unique_id == Studies.SONAR_UDP.value:
 
-                    l_temp_filename = "/tmp/records"
-                    subprocess.call(["rm", l_temp_filename])
-                    subprocess.call(["touch", l_temp_filename])
-                    l_output_file = open(l_temp_filename, APPEND)
-                    l_number_patterns = len(l_indexed_search_patterns)
-                    Printer.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
-                    for l_index, l_search_pattern in enumerate(l_indexed_search_patterns, start=1):
-                        print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), end='')
-                        print('\r')
-                        subprocess.call(["zgrep", "-F", l_search_pattern,l_local_filename], stdout=l_output_file)
-                        l_output_file.flush()
-                    l_output_file.close()
+                        # TODO: this stuff needs to go into method self.__parse_downloaded_study_file
+                        l_temp_filename = "/tmp/records"
+                        subprocess.call(["rm", l_temp_filename])
+                        subprocess.call(["touch", l_temp_filename])
+                        l_output_file = open(l_temp_filename, APPEND)
+                        l_number_patterns = len(l_indexed_search_patterns)
+                        Printer.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
+                        for l_index, l_search_pattern in enumerate(l_indexed_search_patterns, start=1):
+                            print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), end='')
+                            print('\r')
+                            subprocess.call(["zgrep", "-F", l_search_pattern,l_local_filename], stdout=l_output_file)
+                            l_output_file.flush()
+                        l_output_file.close()
 
-                    with open(l_temp_filename, READ) as l_temp_file:
-                        for l_line in l_temp_file:
-                            for l_search_pattern in l_indexed_search_patterns:
-                                if l_search_pattern in l_line:
-                                    l_discovered_service_record: tuple = self.__parse_protocol_line(l_line,
-                                                                    self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
-                                                                    l_usf_record)
-                                    l_discovered_service_records.append(l_discovered_service_record)
-                                    Printer.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
+                        with open(l_temp_filename, READ) as l_temp_file:
+                            for l_line in l_temp_file:
+                                for l_search_pattern in l_indexed_search_patterns:
+                                    if l_search_pattern in l_line:
+                                        l_discovered_service_record: tuple = self.__parse_protocol_line(l_line,
+                                                                        self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
+                                                                        l_usf_record)
+                                        l_discovered_service_records.append(l_discovered_service_record)
+                                        Printer.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
 
-                    if l_discovered_service_records:
-                        SQLite.insert_discovered_service_records(l_discovered_service_records)
-                    SQLite.update_parsed_study_file_record(l_study_filename)
-                    self.__delete_study_file(l_local_filename)
+                        if l_discovered_service_records:
+                            SQLite.delete_obsolete_service_records(l_port)
+                            SQLite.insert_discovered_service_records(l_discovered_service_records)
+                        SQLite.update_parsed_study_file_record(l_study_filename)
+                        self.__delete_study_file(l_local_filename)
 
                 else:
                     raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time. Dont worry. I keep track. Ill get them next time.")
 
+    def export_data(self) -> None:
+        WRITE = 'w'
 
-    # ---------------------------------
-    # public static class methods
-    # ---------------------------------
+        l_column_names: list = SQLite.get_table_column_names('discovered_services')
+        l_ds_records: list = SQLite.get_discovered_service_records(self.type_of_data_to_export)
+        with open(self.export_output_file, WRITE) as l_file:
+            l_csv_writer = csv.writer(l_file, csv.excel)
+            l_csv_writer.writerow(l_column_names)
+            l_csv_writer.writerows(l_ds_records)

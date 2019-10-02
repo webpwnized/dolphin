@@ -4,7 +4,7 @@ from argparser import Parser
 from sonar import Sonar
 import config as Config
 import argparse
-
+import sys
 
 def run_main_program():
 
@@ -34,6 +34,9 @@ def run_main_program():
 
     if Parser.update_studies:
         lSonar.update_studies()
+
+    if Parser.export_data:
+        lSonar.export_data()
 
 if __name__ == '__main__':
 
@@ -69,6 +72,12 @@ if __name__ == '__main__':
     requiredAguments.add_argument('-u', '--update-studies',
                             help='Update database using available Rapid7 Open Data studies and exit',
                             action='store_true')
+    requiredAguments.add_argument('-x', '--export-data',
+                            help='Export data as CSV file to <output_file>. Must provide as one of [TCP, UDP]. Current options include TCP (open TCP ports) and UDP (open UDP ports)',
+                            action='store')
+    lArgParser.add_argument('-o', '--output-file',
+                            help='Output file into which exported data is saved. Required if -x, --export-data provided',
+                            required=('-x' in sys.argv or '--export-data' in sys.argv)) #only required if --export-data is given
 
     Parser.parse_configuration(p_args=lArgParser.parse_args(), p_config=Config)
     run_main_program()

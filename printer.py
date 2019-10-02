@@ -55,12 +55,8 @@ class Printer:
     # "Public" static class variables
     # ---------------------------------
     @property  # getter method
-    def enable_logging(self) -> bool:
+    def logging_enabled(self) -> bool:
         return self.__m_enable_logging
-
-    @enable_logging.setter  # setter method
-    def enable_logging(self: object, p_enable_logging: bool):
-        self.__m_enable_logging = p_enable_logging
 
     @property  # getter method
     def verbose(self) -> bool:

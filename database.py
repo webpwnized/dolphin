@@ -3,6 +3,7 @@ from printer import Printer, Level
 from urllib.request import pathname2url
 from enum import Enum
 import time
+from studies import Studies
 
 class StudyFileRecord():
     study_uniqid: str = ""
@@ -59,17 +60,26 @@ class SQLite():
             Printer.print("Operational Error executing SQLite query: {}".format(l_error), Level.ERROR)
 
     @staticmethod
+    def __execute_parameterized_query(p_connection: sqlite3.Connection, p_query: str, p_parameters: tuple) -> list:
+        try:
+            l_cursor: sqlite3.Cursor = p_connection.cursor()
+            l_cursor.execute(p_query, p_parameters)
+            l_rows: list = l_cursor.fetchall()
+            p_connection.commit()
+            Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
+            return l_rows
+        except sqlite3.ProgrammingError as l_error:
+            Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
+        except sqlite3.OperationalError as l_error:
+            Printer.print("Operational Error executing SQLite query: {}".format(l_error), Level.ERROR)
+
+    @staticmethod
     def __verify_table_exists(p_connection: sqlite3.Connection, p_table_name: str) -> bool:
         l_query: str = "SELECT name FROM sqlite_master WHERE type='table' AND name='{}';".format(p_table_name)
         l_rows: list = SQLite.__execute_query(p_connection, l_query)
         if not l_rows:
             Printer.print("Table {} not found in database".format(p_table_name), Level.ERROR)
         return bool(l_rows)
-
-    @staticmethod
-    def __get_table_columns(p_connection: sqlite3.Connection, p_table_name: str) -> list:
-        l_query = "SELECT * FROM pragma_table_info('{}}');".format(p_table_name)
-        return SQLite.__execute_query(p_connection, l_query)
 
     @staticmethod
     def __enable_foreign_keys(p_connection: sqlite3.Connection) -> None:
@@ -176,12 +186,60 @@ class SQLite():
         Printer.print("Created table discovered_services", Level.SUCCESS)
 
     @staticmethod
+    def get_table_column_names(p_table_name: str) -> list:
+
+        try:
+            Printer.print("Fetching column names for table {}".format(p_table_name), Level.INFO)
+            l_column_names: list = SQLite.get_table_column_metadata(p_table_name)
+            l_names = []
+            for l_column_name in l_column_names:
+                l_names.append(l_column_name[1])
+            return l_names
+        except Exception as l_error:
+            Printer.print("Error fetching column names for table {}: {}".format(p_table_name, l_error), Level.WARNING)
+
+    @staticmethod
+    def get_table_column_metadata(p_table_name: str) -> list:
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Fetching column metadata for table {}".format(p_table_name), Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_ONLY)
+            l_query = "SELECT * FROM pragma_table_info('{}');".format(p_table_name)
+            return SQLite.__execute_query(l_connection, l_query)
+        except sqlite3.Error as l_error:
+            Printer.print("Error fetching column metadata for table {}: {}".format(p_table_name, l_error), Level.WARNING)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
+    def get_discovered_service_records(l_record_type: Studies) -> list:
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Fetching discovered service records", Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_ONLY)
+            l_query: str = "SELECT * " \
+                           "FROM main.discovered_services " \
+                           "WHERE main.discovered_services.study_uniqid = ? " \
+                           "ORDER BY port, ipv4_address;"
+            l_parameters: tuple = (l_record_type.value,)
+            l_records: list = SQLite.__execute_parameterized_query(l_connection, l_query, l_parameters)
+            return l_records
+        except sqlite3.Error as l_error:
+            Printer.print("Error fetching discovered service records: {}".format(l_error), Level.WARNING)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
     def get_unparsed_study_file_records() -> list:
         l_connection:sqlite3.Connection = None
 
         try:
             Printer.print("Fetching unparsed study file records", Level.INFO)
-            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_connection = SQLite.__connect_to_database(Mode.READ_ONLY)
             l_query: str = "SELECT " \
                                "study_uniqid," \
                                "filename," \
@@ -262,6 +320,26 @@ class SQLite():
             Printer.print("Error inserting discovered service records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:
             Printer.print("Error inserting discovered service records: {}".format(l_error), Level.ERROR)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
+    def delete_obsolete_service_records(p_port: int):
+
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Deleting obsolete service records for port {}".format(p_port), Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
+            l_query: str = "DELETE FROM main.discovered_services WHERE port = ?;"
+            l_parameters: tuple = (p_port,)
+            SQLite.__execute_parameterized_query(l_connection, l_query, l_parameters)
+
+        except sqlite3.OperationalError as l_op_error:
+            Printer.print("Error deleting discovered service records: {}".format(l_op_error), Level.ERROR)
+        except sqlite3.Error as l_error:
+            Printer.print("Error deleting discovered service records: {}".format(l_error), Level.ERROR)
         finally:
             if l_connection:
                 l_connection.close()
