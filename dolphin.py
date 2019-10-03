@@ -2,6 +2,7 @@ from argparse import RawTextHelpFormatter
 from printer import Printer,Level
 from argparser import Parser
 from sonar import Sonar
+from studies import Studies
 import config as Config
 import argparse
 import sys
@@ -36,7 +37,7 @@ def run_main_program():
         lSonar.update_studies()
 
     if Parser.export_data:
-        lSonar.export_data()
+        lSonar.export_dataset()
 
 if __name__ == '__main__':
 
@@ -73,7 +74,7 @@ if __name__ == '__main__':
                             help='Update database using available Rapid7 Open Data studies and exit',
                             action='store_true')
     requiredAguments.add_argument('-x', '--export-data',
-                            help='Export data as CSV file to <output_file>. Must provide as one of [TCP, UDP]. Current options include TCP (open TCP ports) and UDP (open UDP ports)',
+                            help='Export data as CSV file to <output_file>. Must provide as one of {}.'.format([Study.name for Study in Studies]),
                             action='store')
     lArgParser.add_argument('-o', '--output-file',
                             help='Output file into which exported data is saved. Required if -x, --export-data provided',

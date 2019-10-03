@@ -481,7 +481,7 @@ class Sonar:
                 else:
                     raise Exception("Rapid7 Open Data API download quota exceeded. Cannot download file at this time. Dont worry. I keep track. Ill get them next time.")
 
-    def export_data(self) -> None:
+    def export_dataset(self) -> None:
         WRITE = 'w'
 
         l_column_names: list = SQLite.get_table_column_names('discovered_services')

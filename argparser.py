@@ -35,13 +35,9 @@ class Parser:
         Parser.show_examples = p_args.examples
         Parser.list_studies = p_args.list_studies
         Parser.update_studies = p_args.update_studies
-        if p_args.export_data:
-            Parser.export_data = True
-            Parser.export_output_file = p_args.output_file
-            if p_args.export_data == 'TCP':
-                Parser.type_of_data_to_export = Studies.SONAR_TCP
-            elif p_args.export_data == 'UDP':
-                Parser.type_of_data_to_export = Studies.SONAR_UDP
+        Parser.export_data = True if p_args.export_data else False
+        Parser.type_of_data_to_export = Studies[p_args.export_data]
+        Parser.export_output_file = p_args.output_file
         Parser.rapid7_open_api_key_file_path = p_config.RAPID7_OPEN_API_KEY_FILE_PATH
         Parser.studies_of_interest = p_config.STUDIES_OF_INTEREST
         Parser.database_filename = p_config.DATABASE_FILENAME

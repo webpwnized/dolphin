@@ -187,13 +187,13 @@ class SQLite():
 
     @staticmethod
     def get_table_column_names(p_table_name: str) -> list:
-
+        NAME = 1
         try:
             Printer.print("Fetching column names for table {}".format(p_table_name), Level.INFO)
             l_column_names: list = SQLite.get_table_column_metadata(p_table_name)
             l_names = []
-            for l_column_name in l_column_names:
-                l_names.append(l_column_name[1])
+            for l_column_tuple in l_column_names:
+                l_names.append(l_column_tuple[NAME])
             return l_names
         except Exception as l_error:
             Printer.print("Error fetching column names for table {}: {}".format(p_table_name, l_error), Level.WARNING)
