@@ -6,6 +6,7 @@ from datetime import datetime
 from argparser import Parser
 import urllib.request
 import urllib.error
+import urllib.parse
 import shutil
 import json
 import os
@@ -14,6 +15,7 @@ import re
 import subprocess
 import csv
 import hashlib
+import getpass
 
 class Sonar:
 
@@ -21,6 +23,8 @@ class Sonar:
     # "Private" class variables
     # ---------------------------------
     __cAPI_KEY_HEADER: str = "X-Api-Key"
+    __cUSER_AGENT_HEADER: str = "User-Agent"
+    __cUSER_AGENT_VALUE: str = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0"
     __cBASE_URL: str = "https://us.api.insight.rapid7.com/opendata/"
     __cQUOTA_URL: str = ''.join([__cBASE_URL, "quota/"])
     __cSTUDIES_URL: str = ''.join([__cBASE_URL, "studies/"])
@@ -38,7 +42,7 @@ class Sonar:
 
     __mAPIKey: str = ""
     __mDebug: bool = False
-    __mVerbose: bool = False
+    __m_verbose: bool = False
     __mAPIKeyFile:str = ""
     __mStudiesOfInterest: list = []
     __m_days_until_study_too_old: int = 0
@@ -47,6 +51,12 @@ class Sonar:
     __m_export_data: bool = False
     __m_type_of_data_to_export: Studies = None
     __m_export_output_file: str = ""
+    __m_use_proxy: bool = False
+    __m_proxy_url: str = ""
+    __m_proxy_port: int = 0
+    __m_proxy_username: str = ""
+    __m_proxy_password: str = ""
+    __m_open_api_connection_timeout: int = 0
 
     # ---------------------------------
     # "Public" class variables
@@ -86,11 +96,11 @@ class Sonar:
 
     @property  # getter method
     def verbose(self) -> bool:
-        return self.__mVerbose
+        return self.__m_verbose
 
     @verbose.setter  # setter method
     def verbose(self: object, pVerbose: bool):
-        self.__mVerbose = pVerbose
+        self.__m_verbose = pVerbose
         self.__mPrinter.verbose = pVerbose
 
     @property  # getter method
@@ -126,11 +136,64 @@ class Sonar:
     def studies_of_interest(self: object, pStudiesOfInterest: list):
         self.__mStudiesOfInterest = pStudiesOfInterest
 
+    @property  # getter method
+    def use_proxy(self) -> bool:
+        return self.__m_use_proxy
+
+    @use_proxy.setter  # setter method
+    def use_proxy(self: object, p_use_proxy: bool):
+        self.__m_use_proxy = p_use_proxy
+
+    @property  # getter method
+    def proxy_url(self) -> str:
+        return self.__m_proxy_url
+
+    @proxy_url.setter  # setter method
+    def proxy_url(self: object, p_proxy_url: str):
+        self.__m_proxy_url = p_proxy_url
+
+    @property  # getter method
+    def proxy_port(self) -> int:
+        return self.__m_proxy_port
+
+    @proxy_port.setter  # setter method
+    def proxy_port(self: object, p_proxy_port: int):
+        self.__m_proxy_port = p_proxy_port
+
+    @property  # getter method
+    def proxy_username(self) -> str:
+        return self.__m_proxy_username
+
+    @proxy_username.setter  # setter method
+    def proxy_username(self: object, p_proxy_username: str):
+        self.__m_proxy_username = p_proxy_username
+
+    @property  # getter method
+    def proxy_password(self) -> str:
+        return self.__m_proxy_password
+
+    @proxy_password.setter  # setter method
+    def proxy_password(self: object, p_proxy_password: str):
+        self.__m_proxy_password = p_proxy_password
+
+    @property  # getter method
+    def open_api_connection_timeout(self) -> int:
+        return self.__m_open_api_connection_timeout
+
+    @open_api_connection_timeout.setter  # setter method
+    def open_api_connection_timeout(self: object, p_open_api_connection_timeout: int):
+        self.__m_open_api_connection_timeout = p_open_api_connection_timeout
+
     # ---------------------------------
     # public instance constructor
     # ---------------------------------
     def __init__(self, p_parser: Parser) -> None:
-        self.__mVerbose: bool = Parser.verbose
+        self.__m_use_proxy = Parser.use_proxy
+        self.__m_proxy_url = Parser.proxy_url
+        self.__m_proxy_port = Parser.proxy_port
+        self.__m_proxy_username = Parser.proxy_username
+        self.__m_proxy_password = Parser.proxy_password   
+        self.__m_verbose: bool = Parser.verbose
         self.__mDebug: bool = Parser.debug
         self.__mPrinter.verbose = Parser.verbose
         self.__mPrinter.debug = Parser.debug
@@ -138,10 +201,11 @@ class Sonar:
         self.__mStudiesOfInterest = Parser.studies_of_interest
         self.__m_days_until_study_too_old = Parser.days_until_study_too_old
         self.__mOrganizations = Parser.organizations
-        SQLite.database_filename = Parser.database_filename
         self.__m_export_data = True if Parser.export_data else False
         self.__m_type_of_data_to_export = Parser.type_of_data_to_export
         self.__m_export_output_file = Parser.export_output_file
+        self.__m_open_api_connection_timeout = Parser.open_api_connection_timeout
+        SQLite.database_filename = Parser.database_filename
         self.__parse_api_key()
 
     # ---------------------------------
@@ -158,7 +222,7 @@ class Sonar:
         SQLite.create_database()
 
     def __parse_api_key(self) -> None:
-        self.__mPrinter.print("Reading Rapid7 Open API key", Level.INFO)
+        self.__mPrinter.print("Reading Rapid7 Open API key from {}".format(self.api_key_file), Level.INFO)
         with open(self.api_key_file) as lKeyFile:
             self.__mAPIKey = lKeyFile.readline()
 
@@ -166,15 +230,42 @@ class Sonar:
         self.__mPrinter.print("Connecting to Rapid7 Open API", Level.INFO)
         lHTTPRequest = urllib.request.Request(pURL)
         lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
+        lHTTPRequest.add_header(self.__cUSER_AGENT_HEADER, self.__cUSER_AGENT_VALUE)
         try:
-            lHTTPResponse = urllib.request.urlopen(lHTTPRequest)
+            if self.__m_use_proxy:
+                l_proxy = urllib.request.ProxyHandler(self.__get_proxies())
+                l_opener = urllib.request.build_opener(l_proxy, urllib.request.HTTPHandler)
+                urllib.request.install_opener(l_opener)
+            lHTTPResponse = urllib.request.urlopen(url=lHTTPRequest, timeout=self.__m_open_api_connection_timeout)
             self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
             return lHTTPResponse
         except urllib.error.HTTPError as lHTTPError:
             self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason),
                                   Level.ERROR)
+            exit("Fatal Error: Cannot connect to Rapid7 Open API. Check connectivity to {}. {}".format(self.__cBASE_URL, 'Upstream proxy is enabled in config.py. Ensure proxy settings are correct.' if self.__m_use_proxy else 'The proxy is not enabled. Should it be?'))
         except urllib.error.URLError as lURLError:
             self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(lURLError.reason), Level.ERROR)
+            exit("Fatal Error: Cannot connect to Rapid7 Open API. Check connectivity to {}. {}".format(self.__cBASE_URL, 'Upstream proxy is enabled in config.py. Ensure proxy settings are correct.' if self.__m_use_proxy else 'The proxy is not enabled. Should it be?'))
+
+    def __get_proxies(self):
+        # If proxy in use, create proxy URL in the format of http://user:password@example.com:port
+        # Otherwise, return empty dictionary
+        SCHEME = 0
+        BASE_URL = 1
+        l_proxy_handler: str = ""
+        if not self.__m_proxy_password:
+            self.__m_proxy_password = getpass.getpass('Please Enter Proxy Password: ')
+        l_parts = self.__m_proxy_url.split('://')
+        l_proxy_url: str = '{}://{}{}{}@{}{}{}'.format(
+            l_parts[SCHEME],
+            self.__m_proxy_username if self.__m_proxy_username else '',
+            ':' if self.__m_proxy_password else '',
+            urllib.parse.quote_plus(self.__m_proxy_password) if self.__m_proxy_password else '',
+            l_parts[BASE_URL],
+            ':' if self.__m_proxy_port else '',
+            self.__m_proxy_port if self.__m_proxy_port else ''
+        )
+        return {l_parts[SCHEME]:l_proxy_url}
 
     def __get_studies(self) -> list:
         # Open Data API --> studies
@@ -430,9 +521,11 @@ class Sonar:
         Printer.print("Fetching and parsing unparsed study files in search of network services", Level.INFO)
 
         # if database not built, build database
+        # TODO: Normalize database tables
         self.__initialize_database()
 
         # re-organize the search patterns into a dictionary
+        # TODO: Convert search patterns to regular expressions
         l_indexed_search_patterns: dict = self.__index_search_patterns()
 
         # save file metadata, mark old files as obsolete and fetch a list of new files

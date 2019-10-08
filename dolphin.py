@@ -77,7 +77,7 @@ if __name__ == '__main__':
                             help='List unparsed Rapid7 Open Data study files and exit. Dolphin knows about these files but has not downloaded and parsed the files yet.',
                             action='store_true')
     requiredAguments.add_argument('-u', '--update-studies',
-                            help='Update database using available Rapid7 Open Data studies and exit',
+                            help='Update database using available Rapid7 Open Data studies and exit. Uses proxy settings in config file if set.',
                             action='store_true')
     requiredAguments.add_argument('-x', '--export-data',
                             help='Export data as CSV file to <output_file>. Must provide as one of {}.'.format([Study.name for Study in Studies]),

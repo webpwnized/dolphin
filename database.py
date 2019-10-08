@@ -46,6 +46,15 @@ class SQLite():
         return None
 
     @staticmethod
+    def __print_rows_affected(p_cursor: sqlite3.Cursor, p_query: str) -> None:
+        FIRST_ROW = 0
+        FIRST_COLUMN = 0
+        if "SELECT" not in p_query:
+            p_cursor.execute("SELECT changes();")
+            l_changes: list = p_cursor.fetchall()
+            Printer.print("Rows affected: {}".format(l_changes[FIRST_ROW][FIRST_COLUMN]), Level.INFO)
+
+    @staticmethod
     def __execute_query(p_connection: sqlite3.Connection, p_query: str) -> list:
         try:
             l_cursor: sqlite3.Cursor = p_connection.cursor()
@@ -53,9 +62,7 @@ class SQLite():
             l_rows: list = l_cursor.fetchall()
             p_connection.commit()
             Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
-            l_cursor.execute("SELECT changes();")
-            l_changes: list = l_cursor.fetchall()
-            Printer.print("Rows affected: {}".format(l_changes), Level.INFO)
+            SQLite.__print_rows_affected(l_cursor, p_query)
             return l_rows
         except sqlite3.ProgrammingError as l_error:
             Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
@@ -70,9 +77,22 @@ class SQLite():
             l_rows: list = l_cursor.fetchall()
             p_connection.commit()
             Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
-            l_cursor.execute("SELECT changes();")
-            l_changes: list = l_cursor.fetchall()
-            Printer.print("Rows affected: {}".format(l_changes), Level.INFO)
+            SQLite.__print_rows_affected(l_cursor, p_query)
+            return l_rows
+        except sqlite3.ProgrammingError as l_error:
+            Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
+        except sqlite3.OperationalError as l_error:
+            Printer.print("Operational Error executing SQLite query: {}".format(l_error), Level.ERROR)
+
+    @staticmethod
+    def __execute_parameterized_queries(p_connection: sqlite3.Connection, p_query: str, p_records: list) -> list:
+        try:
+            l_cursor: sqlite3.Cursor = p_connection.cursor()
+            l_cursor.executemany(p_query, p_records)
+            l_rows: list = l_cursor.fetchall()
+            p_connection.commit()
+            Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
+            SQLite.__print_rows_affected(l_cursor, p_query)
             return l_rows
         except sqlite3.ProgrammingError as l_error:
             Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
@@ -285,10 +305,7 @@ class SQLite():
                                "protocol," \
                                "port" \
                            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            l_cursor: sqlite3.Cursor = l_connection.cursor()
-            l_cursor.executemany(l_query, p_records)
-            l_connection.commit()
-
+            SQLite.__execute_parameterized_queries(l_connection, l_query, p_records)
         except sqlite3.OperationalError as l_op_error:
             Printer.print("Error inserting unparsed study file records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:
@@ -300,7 +317,6 @@ class SQLite():
     @staticmethod
     def insert_discovered_service_records(p_records: list):
         # timestamp_ts, saddr, sport, daddr, dport, ipid, ttl
-
         l_connection:sqlite3.Connection = None
 
         try:
@@ -320,9 +336,7 @@ class SQLite():
                             "parsed_timestamp," \
                             "parsed_timestamp_string" \
                            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(?, 'unixepoch', 'localtime'), ?, datetime(?, 'unixepoch', 'localtime'))"
-            l_cursor: sqlite3.Cursor = l_connection.cursor()
-            l_cursor.executemany(l_query, p_records)
-            l_connection.commit()
+            SQLite.__execute_parameterized_queries(l_connection, l_query, p_records)
         except sqlite3.OperationalError as l_op_error:
             Printer.print("Error inserting discovered service records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:

@@ -25,6 +25,12 @@ class Parser:
     export_data: bool = False
     type_of_data_to_export: str = ""
     export_output_file: str = ""
+    use_proxy: bool = False
+    proxy_url: str = ""
+    proxy_port: int = 0
+    proxy_username: str = ""
+    proxy_password: str = ""
+    open_api_connection_timeout: int = 30
 
     # static methods
     @staticmethod
@@ -52,4 +58,9 @@ class Parser:
         Parser.log_format = p_config.LOG_FORMAT
         Parser.days_until_study_too_old = p_config.DAYS_UNTIL_STUDY_TOO_OLD
         Parser.organizations = p_config.ORGANIZATIONS
-
+        Parser.use_proxy = p_config.USE_PROXY
+        Parser.proxy_url = p_config.PROXY_URL
+        Parser.proxy_port = p_config.PROXY_PORT
+        Parser.proxy_username = p_config.PROXY_USERNAME
+        Parser.proxy_password = p_config.PROXY_PASSWORD
+        Parser.open_api_connection_timeout = p_config.RAPID7_OPEN_API_CONNECTION_TIMEOUT_SECONDS

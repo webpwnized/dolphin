@@ -5,13 +5,20 @@ DATABASE_FILENAME = "dolphin.db"
 RAPID7_OPEN_API_KEY_FILE_PATH = "rapid7-open-api.key"
 STUDIES_OF_INTEREST = ['sonar.tcp','sonar.udp']
 DAYS_UNTIL_STUDY_TOO_OLD = 30
+RAPID7_OPEN_API_CONNECTION_TIMEOUT_SECONDS = 20
 
 LOG_ENABLE_LOGGING = True
 LOG_FILENAME = "dolphin.log"
 LOG_MAX_BYTES_PER_FILE = 1000000
 LOG_MAX_NUMBER_LOG_FILES = 3
-LOG_LEVEL = 30  #Level: CRITICAL=50, ERROR=40, WARNING=30, INFO=20, DEBUG=10, NOTSET=0
+LOG_LEVEL = 20  #Level: CRITICAL=50, ERROR=40, WARNING=30, INFO=20, DEBUG=10, NOTSET=0
 LOG_FORMAT = "%(asctime)s — %(levelname)s — %(message)s"
+
+USE_PROXY = False
+PROXY_URL = "https://PROXYURLHERE"
+PROXY_PORT = 8080
+PROXY_USERNAME = "PROXY USERNAME HERE"
+PROXY_PASSWORD = "PROXY PASSWORD HERE"
 
 # Note: Be sure to set up at least one or more of your organization(s) following the example below.
 # Index is just integers 1 to N where N is the last record
@@ -23,4 +30,3 @@ LOG_FORMAT = "%(asctime)s — %(levelname)s — %(message)s"
 #...MORE RECORDS IF NEEDED...
 #{'index': N, 'organization_name':'Acme Logistics', 'ip_address_range': '16.247.248.6', 'search_patterns': ['16.247.248.6'], 'additional_notes': 'Coyote is owner'},
 #]
-
