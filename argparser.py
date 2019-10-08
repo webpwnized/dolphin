@@ -10,6 +10,7 @@ class Parser:
     show_examples: bool = False
     list_studies: bool = False
     update_studies: bool = False
+    list_unparsed_files: bool = False
     rapid7_open_api_key_file_path: str = ""
     studies_of_interest: list = []
     days_until_study_too_old: int = 0
@@ -34,9 +35,11 @@ class Parser:
         Parser.debug = (p_args.debug if p_args.debug else p_config.DEBUG)
         Parser.show_examples = p_args.examples
         Parser.list_studies = p_args.list_studies
+        Parser.list_unparsed_files = p_args.list_unparsed
         Parser.update_studies = p_args.update_studies
         Parser.export_data = True if p_args.export_data else False
-        Parser.type_of_data_to_export = Studies[p_args.export_data]
+        if p_args.export_data:
+            Parser.type_of_data_to_export = Studies[p_args.export_data]
         Parser.export_output_file = p_args.output_file
         Parser.rapid7_open_api_key_file_path = p_config.RAPID7_OPEN_API_KEY_FILE_PATH
         Parser.studies_of_interest = p_config.STUDIES_OF_INTEREST

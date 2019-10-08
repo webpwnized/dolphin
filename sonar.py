@@ -394,6 +394,19 @@ class Sonar:
             if self.__study_is_interesting(l_study):
                 self.__print_study_metadata(l_study)
 
+    def list_unparsed_files(self) -> None:
+        study_uniqid = 0
+        filename = 1
+        year = 2
+        month = 3
+        day = 4
+        timestamp = 5
+        protocol = 6
+        port = 7
+        l_usf_records: list = SQLite.get_unparsed_study_file_records()
+        for l_record in l_usf_records:
+            Printer.print("{}\t{}\t{}\t{}-{}-{}".format(l_record[0],l_record[6],l_record[7],l_record[2],l_record[3],l_record[4],), Level.PRINT_REGARDLESS)
+
     def quota_exceeded(self) -> bool:
         # Open Data API --> quota
         # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
@@ -456,8 +469,7 @@ class Sonar:
                         l_number_patterns = len(l_indexed_search_patterns)
                         Printer.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
                         for l_index, l_search_pattern in enumerate(l_indexed_search_patterns, start=1):
-                            print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), end='')
-                            print('\r')
+                            Printer.print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), Level.INFO)
                             subprocess.call(["zgrep", "-F", l_search_pattern,l_local_filename], stdout=l_output_file)
                             l_output_file.flush()
                         l_output_file.close()
@@ -472,8 +484,8 @@ class Sonar:
                                         l_discovered_service_records.append(l_discovered_service_record)
                                         Printer.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
 
+                        SQLite.delete_obsolete_service_records(l_port, l_protocol)
                         if l_discovered_service_records:
-                            SQLite.delete_obsolete_service_records(l_port)
                             SQLite.insert_discovered_service_records(l_discovered_service_records)
                         SQLite.update_parsed_study_file_record(l_study_filename)
                         self.__delete_study_file(l_local_filename)

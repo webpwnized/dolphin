@@ -53,6 +53,9 @@ class SQLite():
             l_rows: list = l_cursor.fetchall()
             p_connection.commit()
             Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
+            l_cursor.execute("SELECT changes();")
+            l_changes: list = l_cursor.fetchall()
+            Printer.print("Rows affected: {}".format(l_changes), Level.INFO)
             return l_rows
         except sqlite3.ProgrammingError as l_error:
             Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
@@ -67,6 +70,9 @@ class SQLite():
             l_rows: list = l_cursor.fetchall()
             p_connection.commit()
             Printer.print("Executed SQLite query: {}".format(p_query), Level.DEBUG)
+            l_cursor.execute("SELECT changes();")
+            l_changes: list = l_cursor.fetchall()
+            Printer.print("Rows affected: {}".format(l_changes), Level.INFO)
             return l_rows
         except sqlite3.ProgrammingError as l_error:
             Printer.print("Programming Error: executing SQLite query: {}".format(l_error), Level.ERROR)
@@ -240,6 +246,7 @@ class SQLite():
         try:
             Printer.print("Fetching unparsed study file records", Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_ONLY)
+            # Sort order ensures the most recent file is parsed
             l_query: str = "SELECT " \
                                "study_uniqid," \
                                "filename," \
@@ -250,8 +257,8 @@ class SQLite():
                                "protocol," \
                                "port " \
                            "FROM main.study_files " \
-                           "WHERE main.study_files.parsed <> 'Y' " \
-                           "ORDER BY timestamp DESC;"
+                           "WHERE main.study_files.parsed = 'N' " \
+                           "ORDER BY year DESC, month DESC, day DESC, port ASC, timestamp DESC;"
             l_records: list = SQLite.__execute_query(l_connection, l_query)
             return l_records
         except sqlite3.Error as l_error:
@@ -325,17 +332,16 @@ class SQLite():
                 l_connection.close()
 
     @staticmethod
-    def delete_obsolete_service_records(p_port: int):
+    def delete_obsolete_service_records(p_port: int, p_protocol: str):
 
         l_connection:sqlite3.Connection = None
 
         try:
-            Printer.print("Deleting obsolete service records for port {}".format(p_port), Level.INFO)
+            Printer.print("Deleting obsolete service records for port {}_{}".format(p_port, p_protocol), Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
-            l_query: str = "DELETE FROM main.discovered_services WHERE port = ?;"
-            l_parameters: tuple = (p_port,)
+            l_query: str = "DELETE FROM main.discovered_services WHERE port = ? and protocol = ?;"
+            l_parameters: tuple = (p_port, p_protocol)
             SQLite.__execute_parameterized_query(l_connection, l_query, l_parameters)
-
         except sqlite3.OperationalError as l_op_error:
             Printer.print("Error deleting discovered service records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:
@@ -354,7 +360,7 @@ class SQLite():
             Printer.print("Updating obsolete study file records", Level.INFO)
             l_connection = SQLite.__connect_to_database(Mode.READ_WRITE)
             l_query: str = "UPDATE OR IGNORE main.study_files " \
-                           "SET parsed = 'Y'," \
+                           "SET parsed = 'O'," \
                                "parsed_timestamp = '{}'," \
                                "parsed_timestamp_string = datetime('{}', 'unixepoch', 'localtime') " \
                            "WHERE " \

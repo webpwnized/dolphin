@@ -33,6 +33,9 @@ def run_main_program():
     if Parser.list_studies:
         lSonar.list_studies()
 
+    if Parser.list_unparsed_files:
+        lSonar.list_unparsed_files()
+
     if Parser.update_studies:
         lSonar.update_studies()
 
@@ -69,6 +72,9 @@ if __name__ == '__main__':
                             action='store_true')
     requiredAguments.add_argument('-l', '--list-studies',
                             help='List available Rapid7 Open Data studies and exit',
+                            action='store_true')
+    requiredAguments.add_argument('-p', '--list-unparsed',
+                            help='List unparsed Rapid7 Open Data study files and exit. Dolphin knows about these files but has not downloaded and parsed the files yet.',
                             action='store_true')
     requiredAguments.add_argument('-u', '--update-studies',
                             help='Update database using available Rapid7 Open Data studies and exit',

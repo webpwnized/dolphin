@@ -9,7 +9,7 @@ class Level(Enum):
     CRITICAL = 3
     SUCCESS = 4
     DEBUG = 5
-
+    PRINT_REGARDLESS = 6
 class Printer:
 
     # ---------------------------------
@@ -32,7 +32,8 @@ class Printer:
         Level.WARNING: __yellow,
         Level.ERROR: __red,
         Level.SUCCESS: __green,
-        Level.DEBUG: __cyan
+        Level.DEBUG: __cyan,
+        Level.PRINT_REGARDLESS: __white
     }
     __mLevelMap = {
         Level.INFO: "[*] INFO: ",
@@ -40,7 +41,8 @@ class Printer:
         Level.ERROR: "[*] ERROR: ",
         Level.SUCCESS: "[*] SUCCESS: ",
         Level.CRITICAL: "[*] CRITICAL: ",
-        Level.DEBUG: "[*] DEBUG: "
+        Level.DEBUG: "[*] DEBUG: ",
+        Level.PRINT_REGARDLESS: "[*] "
     }
     __m_enable_logging: bool = False
     __m_logger: logging.Logger = None
@@ -168,6 +170,7 @@ class Printer:
             if (pLevel in [Level.INFO, Level.SUCCESS]) and not Printer.verbose: return None
             if (pLevel in [Level.DEBUG]) and not Printer.debug: return None
             print("\033[1;{}m{}{}\033[21;0m".format(Printer.__mColorMap[pLevel], Printer.__mLevelMap[pLevel], pMessage))
+
             if Printer.__m_enable_logging:
                 if pLevel == Level.DEBUG:
                     Printer.__m_logger.debug(pMessage)
@@ -179,6 +182,7 @@ class Printer:
                     Printer.__m_logger.error(pMessage)
                 elif pLevel == Level.CRITICAL:
                     Printer.__m_logger.critical(pMessage)
+
         except Exception as e:
             print(e)
 
