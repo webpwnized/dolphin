@@ -31,14 +31,14 @@ class SQLite():
 
     @staticmethod
     def __connect_to_database(p_mode: Mode) -> sqlite3.Connection:
+        FIRST_ROW = 0
         try:
             l_database_file_uri: str = 'file:{}?mode={}'.format(pathname2url(SQLite.database_filename), p_mode.value)
             l_connection: sqlite3.Connection = sqlite3.connect(l_database_file_uri, uri=True)
             Printer.print("Connected to SQLite version {} database".format(sqlite3.sqlite_version), Level.SUCCESS)
             l_query:str = "SELECT * FROM pragma_database_list();"
             l_rows = SQLite.__execute_query(l_connection, l_query)
-            for l_row in l_rows:
-                Printer.print("Attached database: {}".format(l_row[SQLite.ATTACHED_DATABASE_FILENAME]), Level.INFO)
+            Printer.print("Attached database: {}".format(l_rows[FIRST_ROW][SQLite.ATTACHED_DATABASE_FILENAME]), Level.INFO)
             return l_connection
         except sqlite3.OperationalError as l_error:
             Printer.print("Error connecting to database: {}".format(l_error), Level.ERROR)

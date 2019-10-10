@@ -374,7 +374,7 @@ class Sonar:
         l_file_metadata_url: str = "{}{}/{}/".format(self.__cFILE_METADATA_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_file_metadata_url)
         l_file_metadata: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
-        Printer.print("File {}: fingerprint {}, {} bytes, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
+        Printer.print("File {}: fingerprint {}, {}, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
         return l_file_metadata
 
     def __get_study_file_download_link(self, p_study: str, p_filname: str) -> str:
@@ -424,6 +424,7 @@ class Sonar:
 
         Printer.print("Downloading interesting study file: study {}, file {}".format(p_study, p_filename), Level.INFO)
 
+        #TODO: Use this information to enrich the study file records
         l_file_information: dict = self.__get_study_file_information(p_study, p_filename)
         l_download_link: str = self.__get_study_file_download_link(p_study, p_filename)
         l_local_filename: str = "/tmp/{}".format(p_filename)
@@ -432,7 +433,10 @@ class Sonar:
 
         Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
-        if not self.__verify_downloaded_file(l_local_filename, l_file_information['fingerprint']):
+        if self.__verify_downloaded_file(l_local_filename, l_file_information['fingerprint']):
+            Printer.print("Downloaded file passed hash verification",
+                          Level.SUCCESS)
+        else:
             Printer.print("Downloaded file failed hash verification: {}".format(p_filename),
                           Level.ERROR)
 
@@ -468,7 +472,10 @@ class Sonar:
     # public instance methods
     # ---------------------------------
     def test_connectivity(self) -> None:
-        lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+        try:
+            lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+        except:
+            Printer.print("Connection test failed. Unable to connection to Rapid7 Open Data API", Level.ERROR)
 
     def check_quota(self) -> None:
         # Open Data API --> quota
@@ -580,6 +587,8 @@ class Sonar:
                         SQLite.delete_obsolete_service_records(l_port, l_protocol)
                         if l_discovered_service_records:
                             SQLite.insert_discovered_service_records(l_discovered_service_records)
+                        else:
+                            Printer.print("No {} services discovered in {}".format(l_study_unique_id, l_study_filename), Level.WARNING)
                         SQLite.update_parsed_study_file_record(l_study_filename)
                         self.__delete_study_file(l_local_filename)
 
