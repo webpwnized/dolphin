@@ -42,8 +42,10 @@ class SQLite():
             return l_connection
         except sqlite3.OperationalError as l_error:
             Printer.print("Error connecting to database: {}".format(l_error), Level.ERROR)
-
-        return None
+            return None
+        except Exception as l_error:
+            Printer.print("Error connecting to database: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
+            return None
 
     @staticmethod
     def __print_rows_affected(p_cursor: sqlite3.Cursor, p_query: str) -> None:

@@ -4,10 +4,6 @@ from database import StudyFileRecord
 from studies import Studies
 from datetime import datetime
 from argparser import Parser
-import urllib.request
-import urllib.error
-import urllib.parse
-import shutil
 import json
 import os
 import time
@@ -16,6 +12,7 @@ import subprocess
 import csv
 import hashlib
 import getpass
+import requests
 
 class Sonar:
 
@@ -57,6 +54,7 @@ class Sonar:
     __m_proxy_username: str = ""
     __m_proxy_password: str = ""
     __m_open_api_connection_timeout: int = 0
+    __m_verify_https_certificate: bool = True
 
     # ---------------------------------
     # "Public" class variables
@@ -184,6 +182,14 @@ class Sonar:
     def open_api_connection_timeout(self: object, p_open_api_connection_timeout: int):
         self.__m_open_api_connection_timeout = p_open_api_connection_timeout
 
+    @property  # getter method
+    def verify_https_certificate(self) -> bool:
+        return self.__m_verify_https_certificate
+
+    @verify_https_certificate.setter  # setter method
+    def verify_https_certificate(self: object, p_verify_https_certificate: bool):
+        self.__m_verify_https_certificate = p_verify_https_certificate
+
     # ---------------------------------
     # public instance constructor
     # ---------------------------------
@@ -228,24 +234,25 @@ class Sonar:
 
     def __connect_to_open_data_api(self, pURL: str):
         self.__mPrinter.print("Connecting to Rapid7 Open API", Level.INFO)
-        lHTTPRequest = urllib.request.Request(pURL)
-        lHTTPRequest.add_header(self.__cAPI_KEY_HEADER, self.__mAPIKey)
-        lHTTPRequest.add_header(self.__cUSER_AGENT_HEADER, self.__cUSER_AGENT_VALUE)
+
+        l_headers = {
+            self.__cAPI_KEY_HEADER: self.__mAPIKey,
+            self.__cUSER_AGENT_HEADER: self.__cUSER_AGENT_VALUE
+        }
+
         try:
+            l_proxies: dict = {}
             if self.__m_use_proxy:
-                l_proxy = urllib.request.ProxyHandler(self.__get_proxies())
-                l_opener = urllib.request.build_opener(l_proxy, urllib.request.HTTPHandler)
-                urllib.request.install_opener(l_opener)
-            lHTTPResponse = urllib.request.urlopen(url=lHTTPRequest, timeout=self.__m_open_api_connection_timeout)
+                self.__mPrinter.print("Using upstream proxy", Level.INFO)
+                l_proxies = self.__get_proxies()
+            lHTTPResponse = requests.get(url=pURL, headers=l_headers, proxies=l_proxies, timeout=self.open_api_connection_timeout, verify=self.__m_verify_https_certificate)
             self.__mPrinter.print("Connected to Rapid7 Open API", Level.SUCCESS)
             return lHTTPResponse
-        except urllib.error.HTTPError as lHTTPError:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(lHTTPError.code, lHTTPError.reason),
-                                  Level.ERROR)
-            exit("Fatal Error: Cannot connect to Rapid7 Open API. Check connectivity to {}. {}".format(self.__cBASE_URL, 'Upstream proxy is enabled in config.py. Ensure proxy settings are correct.' if self.__m_use_proxy else 'The proxy is not enabled. Should it be?'))
-        except urllib.error.URLError as lURLError:
-            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {}".format(lURLError.reason), Level.ERROR)
-            exit("Fatal Error: Cannot connect to Rapid7 Open API. Check connectivity to {}. {}".format(self.__cBASE_URL, 'Upstream proxy is enabled in config.py. Ensure proxy settings are correct.' if self.__m_use_proxy else 'The proxy is not enabled. Should it be?'))
+        except Exception as lRequestError:
+            self.__mPrinter.print("Cannot connect to Rapid7 Open API: {} {}".format(type(lRequestError).__name__, lRequestError), Level.ERROR)
+            exit("Fatal Error: Cannot connect to Rapid7 Open API. Check connectivity to {}. {}".format(
+                    self.__cBASE_URL,
+                    'Upstream proxy is enabled in config.py. Ensure proxy settings are correct.' if self.__m_use_proxy else 'The proxy is not enabled. Should it be?'))
 
     def __get_proxies(self):
         # If proxy in use, create proxy URL in the format of http://user:password@example.com:port
@@ -256,16 +263,21 @@ class Sonar:
         if not self.__m_proxy_password:
             self.__m_proxy_password = getpass.getpass('Please Enter Proxy Password: ')
         l_parts = self.__m_proxy_url.split('://')
-        l_proxy_url: str = '{}://{}{}{}@{}{}{}'.format(
-            l_parts[SCHEME],
+        l_http_proxy_url: str = 'http://{}{}{}@{}{}{}'.format(
             self.__m_proxy_username if self.__m_proxy_username else '',
             ':' if self.__m_proxy_password else '',
-            urllib.parse.quote_plus(self.__m_proxy_password) if self.__m_proxy_password else '',
+            requests.utils.requote_uri(self.__m_proxy_password) if self.__m_proxy_password else '',
             l_parts[BASE_URL],
             ':' if self.__m_proxy_port else '',
             self.__m_proxy_port if self.__m_proxy_port else ''
         )
-        return {l_parts[SCHEME]:l_proxy_url}
+        l_https_proxy_url = l_http_proxy_url.replace('http://', 'https://')
+        l_password_mask = '*' * len(self.__m_proxy_password)
+        l_proxy_handlers = {'http':l_http_proxy_url, 'https':l_https_proxy_url}
+        self.__mPrinter.print("Building proxy handlers: {},{}".format(
+            l_http_proxy_url.replace(self.__m_proxy_password, l_password_mask),
+            l_https_proxy_url.replace(self.__m_proxy_password, l_password_mask)), Level.INFO)
+        return l_proxy_handlers
 
     def __get_studies(self) -> list:
         # Open Data API --> studies
@@ -273,7 +285,7 @@ class Sonar:
         # "study_bibtext","contact_name","contact_email","organization_name","organization_website",
         # "created_at","updated_at","sonarfile_set"
         lHTTPResponse = self.__connect_to_open_data_api(self.__cSTUDIES_URL)
-        return(json.loads(lHTTPResponse.read().decode('utf-8')))
+        return (json.loads(lHTTPResponse.text))
 
     def __study_is_interesting(self, p_study: dict) -> bool:
         return(p_study['uniqid'] in self.studies_of_interest)
@@ -373,7 +385,7 @@ class Sonar:
         Printer.print("Fetching metadata: study {}, file {}".format(p_study, p_filname), Level.INFO)
         l_file_metadata_url: str = "{}{}/{}/".format(self.__cFILE_METADATA_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_file_metadata_url)
-        l_file_metadata: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_file_metadata: dict = json.loads(lHTTPResponse.text)
         Printer.print("File {}: fingerprint {}, {}, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
         return l_file_metadata
 
@@ -383,7 +395,7 @@ class Sonar:
         Printer.print("Fetching study file download link: study {}, file {}".format(p_study, p_filname), Level.INFO)
         l_download_url: str = "{}{}/{}/download/".format(self.__cFILE_DOWNLOAD_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_download_url)
-        l_response: dict = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_response: dict = json.loads(lHTTPResponse.text)
         l_download_link: str = l_response['url']
         Printer.print("Fetched download link for file {} from study {}: {}".format(p_filname, p_study, l_download_link), Level.SUCCESS)
         return l_download_link
@@ -428,9 +440,14 @@ class Sonar:
         l_file_information: dict = self.__get_study_file_information(p_study, p_filename)
         l_download_link: str = self.__get_study_file_download_link(p_study, p_filename)
         l_local_filename: str = "/tmp/{}".format(p_filename)
-        with urllib.request.urlopen(l_download_link) as l_http_response, open(l_local_filename, WRITE_BYTES) as l_output_file:
-           shutil.copyfileobj(l_http_response, l_output_file)
+        l_proxies: dict = {}
 
+        Printer.print("Beginning download", Level.INFO)
+        if self.__m_use_proxy:
+            self.__mPrinter.print("Using upstream proxy", Level.INFO)
+            l_proxies = self.__get_proxies()
+        l_http_response = requests.get(l_download_link, proxies=l_proxies, verify=self.__m_verify_https_certificate)
+        open(l_local_filename, WRITE_BYTES).write(l_http_response.content)
         Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
         if self.__verify_downloaded_file(l_local_filename, l_file_information['fingerprint']):
@@ -474,16 +491,18 @@ class Sonar:
     def test_connectivity(self) -> None:
         try:
             lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
+            if not self.verbose:
+                Printer.print("SUCCESS: Connected to Rapid7 Open Data API", Level.PRINT_REGARDLESS)
         except:
-            Printer.print("Connection test failed. Unable to connection to Rapid7 Open Data API", Level.ERROR)
+            Printer.print("Connection test failed. Unable to connect to Rapid7 Open Data API", Level.ERROR)
 
     def check_quota(self) -> None:
         # Open Data API --> quota
         # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
         lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
-        l_quota = json.loads(lHTTPResponse.read().decode('utf-8'))
-        Printer.print("{}/{} requests used in last {} hours".format(
-            l_quota['quota_used'],l_quota['quota_allowed'],int(int(l_quota['quota_timespan'])/self.__SECONDS_PER_HOUR)), Level.INFO
+        l_quota = json.loads(lHTTPResponse.text)
+        Printer.print("{}/{} requests used in last {} hours. {} downloads remaining.".format(
+            l_quota['quota_used'],l_quota['quota_allowed'],int(int(l_quota['quota_timespan'])/self.__SECONDS_PER_HOUR), int(l_quota['quota_allowed']) - int(l_quota['quota_used'])), Level.PRINT_REGARDLESS
         )
 
     def list_studies(self) -> None:
@@ -509,7 +528,7 @@ class Sonar:
         # Open Data API --> quota
         # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
         lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
-        l_quota = json.loads(lHTTPResponse.read().decode('utf-8'))
+        l_quota = json.loads(lHTTPResponse.text)
         l_downloads_left = int(l_quota['quota_left'])
         Printer.print("{} Rapid7 OpenData API requests left".format(l_downloads_left), Level.INFO)
         return (l_downloads_left == 0)
@@ -563,7 +582,8 @@ class Sonar:
 
                         # TODO: this stuff needs to go into method self.__parse_downloaded_study_file
                         l_temp_filename = "/tmp/records"
-                        subprocess.call(["rm", l_temp_filename])
+                        if os.path.exists(l_temp_filename):
+                            os.remove(l_temp_filename)
                         subprocess.call(["touch", l_temp_filename])
                         l_output_file = open(l_temp_filename, APPEND)
                         l_number_patterns = len(l_indexed_search_patterns)

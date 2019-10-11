@@ -10,6 +10,7 @@ class Level(Enum):
     SUCCESS = 4
     DEBUG = 5
     PRINT_REGARDLESS = 6
+
 class Printer:
 
     # ---------------------------------
@@ -33,7 +34,7 @@ class Printer:
         Level.ERROR: __red,
         Level.SUCCESS: __green,
         Level.DEBUG: __cyan,
-        Level.PRINT_REGARDLESS: __white
+        Level.PRINT_REGARDLESS: __blue
     }
     __mLevelMap = {
         Level.INFO: "[*] INFO: ",
@@ -42,7 +43,7 @@ class Printer:
         Level.SUCCESS: "[*] SUCCESS: ",
         Level.CRITICAL: "[*] CRITICAL: ",
         Level.DEBUG: "[*] DEBUG: ",
-        Level.PRINT_REGARDLESS: "[*] "
+        Level.PRINT_REGARDLESS: "[*] INFO: "
     }
     __m_enable_logging: bool = False
     __m_logger: logging.Logger = None
@@ -192,13 +193,27 @@ class Printer:
 Test connectivity to Rapid7 Open Data API\n
 \tpython3 dolphin.py --verbose --test
 \tpython3 byepass.py -v -t
-\nDisplay Rapid7 Open Data API quota\n
+
+Display Rapid7 Open Data API quota\n
 \tpython3 dolphin.py --verbose --quota
 \tpython3 byepass.py -v -q
-\nList available Rapid7 Open Data studies\n
+
+List available Rapid7 Open Data studies\n
 \tpython3 dolphin.py --verbose --list-studies
 \tpython3 byepass.py -v -l
-\nUpdate database using available Rapid7 Open Data studies\n
+
+List un-parsed Rapid7 Open Data studies\n
+\tpython3 dolphin.py --verbose --list-unparsed
+\tpython3 byepass.py -v -p
+
+Update database using available Rapid7 Open Data studies\n
 \tpython3 dolphin.py --verbose --update-studies
 \tpython3 byepass.py -v -u
-    """)
+
+Update database using available Rapid7 Open Data studies\n
+\tpython3 dolphin.py --verbose --export-data SONAR_TCP --output-file /tmp/data.csv
+\tpython3 byepass.py -v -x SONAR_TCP -o /tmp/data.csv
+
+\tpython3 dolphin.py --verbose --export-data SONAR_UDP --output-file /tmp/data.csv
+\tpython3 byepass.py -v -x SONAR_UDP -o /tmp/data.csv
+""")

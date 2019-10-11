@@ -31,6 +31,7 @@ class Parser:
     proxy_username: str = ""
     proxy_password: str = ""
     open_api_connection_timeout: int = 30
+    verify_https_certificate = True
 
     # static methods
     @staticmethod
@@ -64,3 +65,4 @@ class Parser:
         Parser.proxy_username = p_config.PROXY_USERNAME
         Parser.proxy_password = p_config.PROXY_PASSWORD
         Parser.open_api_connection_timeout = p_config.RAPID7_OPEN_API_CONNECTION_TIMEOUT_SECONDS
+        Parser.verify_https_certificate = p_config.VERIFY_HTTPS_CERTIFICATE
