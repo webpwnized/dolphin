@@ -220,6 +220,8 @@ class Sonar:
         self.__m_type_of_data_to_export = Parser.type_of_data_to_export
         self.__m_export_output_file = Parser.export_output_file
         self.__m_open_api_connection_timeout = Parser.open_api_connection_timeout
+        self.__m_verify_https_certificate = Parser.verify_https_certificate
+        self.__m_seconds_to_wait_for_download_credits = Parser.seconds_to_wait_for_download_credits
         SQLite.database_filename = Parser.database_filename
         self.__parse_api_key()
 
