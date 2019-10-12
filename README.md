@@ -16,7 +16,7 @@
       -q, --quota           Display Rapid7 Open Data API quota and exit
       -l, --list-studies    List available Rapid7 Open Data studies and exit
       -p, --list-unparsed   List unparsed Rapid7 Open Data study files and exit. Dolphin knows about these files but has not downloaded and parsed the files yet.
-      -u, --update-studies  Update database using available Rapid7 Open Data studies and exit. Uses proxy settings in config file if set.
+      -u, --update-studies  Update database using available Rapid7 Open Data studies and exit. Uses proxy settings in config file if set. Check quota before calling.
       -x EXPORT_DATA, --export-data EXPORT_DATA
                             Export data as CSV file to <output_file>. Must provide as one of ['SONAR_TCP', 'SONAR_UDP'].
       -o OUTPUT_FILE, --output-file OUTPUT_FILE
