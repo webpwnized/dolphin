@@ -66,3 +66,4 @@ class Parser:
         Parser.proxy_password = p_config.PROXY_PASSWORD
         Parser.open_api_connection_timeout = p_config.RAPID7_OPEN_API_CONNECTION_TIMEOUT_SECONDS
         Parser.verify_https_certificate = p_config.VERIFY_HTTPS_CERTIFICATE
+        Parser.seconds_to_wait_for_download_credits = p_config.SLEEP_WAITING_FOR_DOWNLOAD_CREDITS_SECONDS
