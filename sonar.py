@@ -644,8 +644,8 @@ class Sonar:
                         SQLite.insert_discovered_service_records(l_discovered_service_records)
                     else:
                         self.__mPrinter.print("No {} services discovered in {}".format(l_study_unique_id, l_study_filename), Level.WARNING)
-                    SQLite.update_parsed_study_file_record(l_study_filename)
                     SQLite.update_outdated_study_file_records(l_port, l_protocol, l_study_timestamp)
+                    SQLite.update_parsed_study_file_record(l_study_filename)
                     self.__delete_study_file(l_local_filename)
 
                 else:
