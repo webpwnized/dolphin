@@ -262,6 +262,39 @@ class SQLite():
                 l_connection.close()
 
     @staticmethod
+    def __convert_epoch_to_string(p_epoch_time: int) -> str:
+        return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(p_epoch_time))
+
+    @staticmethod
+    def get_newer_study_file_records(p_port: int, p_protocol: str, p_timestamp: int) -> list:
+        l_connection:sqlite3.Connection = None
+
+        try:
+            Printer.print("Fetching study file records newer than {}".format(SQLite.__convert_epoch_to_string(p_timestamp)), Level.INFO)
+            l_connection = SQLite.__connect_to_database(Mode.READ_ONLY)
+            # Sort order ensures the most recent file is parsed
+            l_query: str = "SELECT " \
+                               "filename," \
+                               "timestamp," \
+                               "protocol," \
+                               "port " \
+                            "FROM main.study_files " \
+                            "WHERE main.study_files.port = ? " \
+                            "   AND main.study_files.protocol = ? " \
+                            "   AND main.study_files.timestamp > ? " \
+                            "ORDER BY year DESC, month DESC, day DESC, port ASC, timestamp DESC;"
+            l_parameters: tuple = (p_port, p_protocol, p_timestamp)
+            l_records: list = SQLite.__execute_parameterized_query(l_connection, l_query, l_parameters)
+            return l_records
+        except sqlite3.Error as l_error:
+            Printer.print("Error fetching study file records newer than {}".format(SQLite.__convert_epoch_to_string(p_timestamp)), Level.ERROR)
+        except Exception as l_error:
+            Printer.print("EError fetching newer study file records: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
+        finally:
+            if l_connection:
+                l_connection.close()
+
+    @staticmethod
     def get_unparsed_study_file_records() -> list:
         l_connection:sqlite3.Connection = None
 
@@ -285,6 +318,8 @@ class SQLite():
             return l_records
         except sqlite3.Error as l_error:
             Printer.print("Error fetching unparsed study file records: {}".format(l_error), Level.WARNING)
+        except Exception as l_error:
+            Printer.print("Error fetching unparsed study file records: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
         finally:
             if l_connection:
                 l_connection.close()
@@ -312,6 +347,8 @@ class SQLite():
             Printer.print("Error inserting unparsed study file records: {}".format(l_op_error), Level.ERROR)
         except sqlite3.Error as l_error:
             Printer.print("Error inserting unparsed study file records: {}".format(l_error), Level.ERROR)
+        except Exception as l_error:
+            Printer.print("Error inserting unparsed study file records: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
         finally:
             if l_connection:
                 l_connection.close()

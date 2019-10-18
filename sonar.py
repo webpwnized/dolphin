@@ -4,6 +4,7 @@ from database import StudyFileRecord
 from studies import Studies
 from datetime import datetime
 from argparser import Parser
+from enum import Enum
 import json
 import os
 import time
@@ -13,6 +14,10 @@ import csv
 import hashlib
 import getpass
 import requests
+
+class Override(Enum):
+    FORCE_OUTPUT = True
+    USE_DEFAULTS = False
 
 class Sonar:
 
@@ -38,13 +43,13 @@ class Sonar:
     __cPORT: int = 1
 
     __mAPIKey: str = ""
-    __mDebug: bool = False
+    __m_debug: bool = False
     __m_verbose: bool = False
-    __mAPIKeyFile:str = ""
-    __mStudiesOfInterest: list = []
+    __m_api_key_file:str = ""
+    __m_studies_of_interest: list = []
     __m_days_until_study_too_old: int = 0
     __mPrinter: Printer = Printer
-    __mOrganizations: list = []
+    __m_organizations: list = []
     __m_export_data: bool = False
     __m_type_of_data_to_export: Studies = None
     __m_export_output_file: str = ""
@@ -87,11 +92,11 @@ class Sonar:
 
     @property  # getter method
     def organizations(self) -> list:
-        return self.__mOrganizations
+        return self.__m_organizations
 
     @organizations.setter  # setter method
     def organizations(self: object, p_organizations: list):
-        self.__mOrganizations = p_organizations
+        self.__m_organizations = p_organizations
 
     @property  # getter method
     def verbose(self) -> bool:
@@ -104,11 +109,11 @@ class Sonar:
 
     @property  # getter method
     def debug(self) -> bool:
-        return self.__mDebug
+        return self.__m_debug
 
     @debug.setter  # setter method
     def debug(self: object, pDebug: bool):
-        self.__mDebug = pDebug
+        self.__m_debug = pDebug
         self.__mPrinter.debug = pDebug
 
     @property  # getter method
@@ -121,19 +126,19 @@ class Sonar:
 
     @property  # getter method
     def api_key_file(self) -> str:
-        return self.__mAPIKeyFile
+        return self.__m_api_key_file
 
     @api_key_file.setter  # setter method
     def api_key_file(self: object, pAPIKeyFile: str):
-        self.__mAPIKeyFile = pAPIKeyFile
+        self.__m_api_key_file = pAPIKeyFile
 
     @property  # getter method
     def studies_of_interest(self) -> list:
-        return self.__mStudiesOfInterest
+        return self.__m_studies_of_interest
 
     @studies_of_interest.setter  # setter method
     def studies_of_interest(self: object, pStudiesOfInterest: list):
-        self.__mStudiesOfInterest = pStudiesOfInterest
+        self.__m_studies_of_interest = pStudiesOfInterest
 
     @property  # getter method
     def use_proxy(self) -> bool:
@@ -209,13 +214,13 @@ class Sonar:
         self.__m_proxy_username = Parser.proxy_username
         self.__m_proxy_password = Parser.proxy_password   
         self.__m_verbose: bool = Parser.verbose
-        self.__mDebug: bool = Parser.debug
+        self.__m_debug: bool = Parser.debug
         self.__mPrinter.verbose = Parser.verbose
         self.__mPrinter.debug = Parser.debug
-        self.__mAPIKeyFile = Parser.rapid7_open_api_key_file_path
-        self.__mStudiesOfInterest = Parser.studies_of_interest
+        self.__m_api_key_file = Parser.rapid7_open_api_key_file_path
+        self.__m_studies_of_interest = Parser.studies_of_interest
         self.__m_days_until_study_too_old = Parser.days_until_study_too_old
-        self.__mOrganizations = Parser.organizations
+        self.__m_organizations = Parser.organizations
         self.__m_export_data = True if Parser.export_data else False
         self.__m_type_of_data_to_export = Parser.type_of_data_to_export
         self.__m_export_output_file = Parser.export_output_file
@@ -301,21 +306,22 @@ class Sonar:
     def __study_is_interesting(self, p_study: dict) -> bool:
         return(p_study['uniqid'] in self.studies_of_interest)
 
-    def __print_study_metadata(self, pStudy: dict) -> None:
+    def __print_study_metadata(self, pStudy: dict, p_force_output: Override) -> None:
         # Open Data API --> studies
         # "uniqid","name","short_desc","long_desc","study_url","study_name","study_venue",
         # "study_bibtext","contact_name","contact_email","organization_name","organization_website",
         # "created_at","updated_at","sonarfile_set"
-        Printer.print("Found study of interest", Level.SUCCESS)
-        Printer.print("{} {}".format(pStudy['uniqid'], pStudy['name']), Level.INFO)
-        Printer.print("Updated: {}".format(pStudy['updated_at']), Level.INFO)
-        Printer.print("{}".format(pStudy['short_desc']), Level.INFO)
-        Printer.print("{}".format(pStudy['long_desc']), Level.INFO)
-        Printer.print("{} files are available".format(len(pStudy['sonarfile_set'])), Level.INFO)
+        p_debug_level = Level.PRINT_REGARDLESS if p_force_output.FORCE_OUTPUT else Level.INFO
+        self.__mPrinter.print("Found study of interest", Level.SUCCESS)
+        self.__mPrinter.print("{} {}".format(pStudy['uniqid'], pStudy['name']), p_debug_level)
+        self.__mPrinter.print("Updated: {}".format(pStudy['updated_at']), p_debug_level)
+        self.__mPrinter.print("{}".format(pStudy['short_desc']), p_debug_level)
+        self.__mPrinter.print("{}".format(pStudy['long_desc']), p_debug_level)
+        self.__mPrinter.print("{} files are available".format(len(pStudy['sonarfile_set'])), p_debug_level)
 
     def __print_study_filename_record(self, l_record: StudyFileRecord) -> None:
         print()
-        Printer.print("Filename: {}, Protocol: {}, Port:{}, Timestamp: {}".format(l_record.filename,l_record.protocol,l_record.port,l_record.timestamp_string), Level.INFO)
+        self.__mPrinter.print("Filename: {}, Protocol: {}, Port:{}, Timestamp: {}".format(l_record.filename,l_record.protocol,l_record.port,l_record.timestamp_string), Level.INFO)
 
     def __parse_study_filename(self, p_study: str, p_filename: str) -> StudyFileRecord:
 
@@ -325,16 +331,16 @@ class Sonar:
         try:
             l_record.study_uniqid = p_study
             l_record.filename = p_filename
-            l_record.year = l_parts[self.__cYEAR]
-            l_record.month = l_parts[self.__cMONTH]
-            l_record.day = l_parts[self.__cDAY]
-            l_record.timestamp = l_parts[self.__cEPOCH_TIME]
+            l_record.year = int(l_parts[self.__cYEAR])
+            l_record.month = int(l_parts[self.__cMONTH])
+            l_record.day = int(l_parts[self.__cDAY])
+            l_record.timestamp = int(l_parts[self.__cEPOCH_TIME])
             l_record.timestamp_string = datetime.fromtimestamp((float(l_parts[self.__cEPOCH_TIME])))
 
             l_protocol_port = l_parts[self.__cFILESET].rsplit('_', self.__cLAST_OCCURENCE)
             if l_protocol_port.__len__() == 2 and str.isdigit(l_protocol_port[1]):
                 l_record.protocol = l_protocol_port[0]
-                l_record.port =l_protocol_port[1]
+                l_record.port = int(l_protocol_port[1])
             elif l_protocol_port.__len__() == 2:
                 l_record.protocol = "".format(l_protocol_port[0], l_protocol_port[1])
                 l_record.port = -1
@@ -342,13 +348,13 @@ class Sonar:
                 l_record.protocol = l_protocol_port[0]
                 l_record.port = -1
             else:
-                Printer.print("Unexpected format: {}".format(l_protocol_port), Level.WARNING)
+                self.__mPrinter.print("Unexpected format: {}".format(l_protocol_port), Level.WARNING)
 
             self.__print_study_filename_record(l_record)
             return l_record
         except IndexError as l_index_error:
             l_record = None
-            Printer.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
+            self.__mPrinter.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
 
     def __parse_protocol_line(self, p_study_file_line: str, p_organization: dict, p_study_file_record: list) -> tuple:
         # Discovered Service
@@ -393,38 +399,43 @@ class Sonar:
     def __get_study_file_information(self, p_study: str, p_filname: str) -> dict:
         # Open Data API --> studies/<study unique ID>/<filename>
         # "name", "fingerprint", "size (bytes)", "updated_at"
-        Printer.print("Fetching metadata: study {}, file {}".format(p_study, p_filname), Level.INFO)
+        self.__mPrinter.print("Fetching metadata: study {}, file {}".format(p_study, p_filname), Level.INFO)
         l_file_metadata_url: str = "{}{}/{}/".format(self.__cFILE_METADATA_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_file_metadata_url)
         l_file_metadata: dict = json.loads(lHTTPResponse.text)
-        Printer.print("File {}: fingerprint {}, {}, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
+        self.__mPrinter.print("File {}: fingerprint {}, {}, updated at {}".format(l_file_metadata["name"],l_file_metadata["fingerprint"],self.__format_file_size(int(l_file_metadata["size"])),l_file_metadata["updated_at"]), Level.INFO)
         return l_file_metadata
 
     def __get_study_file_download_link(self, p_study: str, p_filname: str) -> str:
         # Open Data API --> studies/<study unique ID>/<filename>/download/
         # "url"
-        Printer.print("Fetching study file download link: study {}, file {}".format(p_study, p_filname), Level.INFO)
+        self.__mPrinter.print("Fetching study file download link: study {}, file {}".format(p_study, p_filname), Level.INFO)
         l_download_url: str = "{}{}/{}/download/".format(self.__cFILE_DOWNLOAD_BASE_URL, p_study, p_filname)
         lHTTPResponse = self.__connect_to_open_data_api(l_download_url)
         l_response: dict = json.loads(lHTTPResponse.text)
         l_download_link: str = l_response['url']
-        Printer.print("Fetched download link for file {} from study {}: {}".format(p_filname, p_study, l_download_link), Level.SUCCESS)
+        self.__mPrinter.print("Fetched download link for file {} from study {}: {}".format(p_filname, p_study, l_download_link), Level.SUCCESS)
         return l_download_link
+
+    def __study_file_record_is_new(self, p_study_file_record: StudyFileRecord) -> bool:
+        l_newer_record_already_in_database: bool = bool(SQLite.get_newer_study_file_records(p_study_file_record.port, p_study_file_record.protocol, p_study_file_record.timestamp).__len__())
+        return not l_newer_record_already_in_database
 
     def __get_available_sonar_files(self) -> list:
         l_studies: list = self.__get_studies()
         l_interesting_files = []
 
-        Printer.print("Checking if any interesting Sonar files are available for download", Level.INFO)
+        self.__mPrinter.print("Checking if any interesting Sonar files are available for download", Level.INFO)
 
         # if an interesting file is found in an interesting study, download the file metadata
         for l_study in l_studies:
             if self.__study_is_interesting(l_study):
-                self.__print_study_metadata(l_study)
+                self.__print_study_metadata(l_study, Override.USE_DEFAULTS)
                 for l_filename in l_study['sonarfile_set']:
                     l_sf_record: StudyFileRecord = self.__parse_study_filename(l_study['uniqid'], l_filename)
                     if l_sf_record:
-                        l_interesting_files.append((l_sf_record.study_uniqid, l_sf_record.filename, l_sf_record.year, l_sf_record.month, l_sf_record.day, l_sf_record.timestamp, l_sf_record.timestamp_string, l_sf_record.protocol, l_sf_record.port))
+                        if self.__study_file_record_is_new(l_sf_record):
+                            l_interesting_files.append((l_sf_record.study_uniqid, l_sf_record.filename, l_sf_record.year, l_sf_record.month, l_sf_record.day, l_sf_record.timestamp, l_sf_record.timestamp_string, l_sf_record.protocol, l_sf_record.port))
 
         return l_interesting_files
 
@@ -432,7 +443,7 @@ class Sonar:
         BLOCKSIZE = 65536
         READ_BYTES = 'rb'
 
-        Printer.print("Verifying hash of downloaded study file {}".format(p_local_filename), Level.INFO)
+        self.__mPrinter.print("Verifying hash of downloaded study file {}".format(p_local_filename), Level.INFO)
 
         l_hash_generator = hashlib.sha1()
         with open(p_local_filename, READ_BYTES) as l_file:
@@ -445,7 +456,7 @@ class Sonar:
     def __download_study_file(self, p_study, p_filename) -> str:
         WRITE_BYTES: str = 'wb'
 
-        Printer.print("Downloading interesting study file: study {}, file {}".format(p_study, p_filename), Level.INFO)
+        self.__mPrinter.print("Downloading interesting study file: study {}, file {}".format(p_study, p_filename), Level.INFO)
 
         #TODO: Use this information to enrich the study file records
         l_file_information: dict = self.__get_study_file_information(p_study, p_filename)
@@ -453,26 +464,26 @@ class Sonar:
         l_local_filename: str = "/tmp/{}".format(p_filename)
         l_proxies: dict = {}
 
-        Printer.print("Beginning download", Level.INFO)
+        self.__mPrinter.print("Beginning download", Level.INFO)
         if self.__m_use_proxy:
             self.__mPrinter.print("Using upstream proxy", Level.INFO)
             l_proxies = self.__get_proxies()
         l_http_response = requests.get(l_download_link, proxies=l_proxies, verify=self.__m_verify_https_certificate)
         open(l_local_filename, WRITE_BYTES).write(l_http_response.content)
-        Printer.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
+        self.__mPrinter.print("Downloaded file to {}".format(l_local_filename), Level.SUCCESS)
 
         if self.__verify_downloaded_file(l_local_filename, l_file_information['fingerprint']):
-            Printer.print("Downloaded file passed hash verification",
+            self.__mPrinter.print("Downloaded file passed hash verification",
                           Level.SUCCESS)
         else:
-            Printer.print("Downloaded file failed hash verification: {}".format(p_filename),
+            self.__mPrinter.print("Downloaded file failed hash verification: {}".format(p_filename),
                           Level.ERROR)
 
         return l_local_filename
 
     def __delete_study_file(self, p_local_filename: str) -> None:
         try:
-            Printer.print("Deleting file to {}".format(p_local_filename), Level.SUCCESS)
+            self.__mPrinter.print("Deleting file to {}".format(p_local_filename), Level.SUCCESS)
             os.remove(p_local_filename)
         except OSError:
             pass
@@ -483,10 +494,10 @@ class Sonar:
         # dictionary "l_indexed_search_patterns", the index is the search pattern and the
         # value is the "index" field from the organizations dictionary. If a match is found
         # on a search pattern, it will be easy to retrieve the meta-data about the organization.
-        Printer.print("Indexing search patterns", Level.INFO)
+        self.__mPrinter.print("Indexing search patterns", Level.INFO)
         l_indexed_search_patterns: dict = {}
         l_regexp = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
-        for l_organization in self.__mOrganizations:
+        for l_organization in self.__m_organizations:
             for l_search_pattern in l_organization['search_patterns']:
                 #The comma is added before the search pattern because the records from Rapid7 are CSV format
                 # i.e. to search for 10.20.30.0/24 we need to search for and record with ",10.20.30"
@@ -497,12 +508,12 @@ class Sonar:
         return l_indexed_search_patterns
 
     def __sleep_until_download_credits_available(self):
-        Printer.print("Checking quota", Level.INFO)
+        self.__mPrinter.print("Checking quota", Level.INFO)
         while self.quota_exceeded():
-            Printer.print("Quota exceeded. The current time is {}. I will try again in {} minutes".format(
+            self.__mPrinter.print("Quota exceeded. The current time is {}. I will try again in {} minutes".format(
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.__m_seconds_to_wait_for_download_credits / 60), Level.WARNING)
             time.sleep(self.__m_seconds_to_wait_for_download_credits)
-        Printer.print("We have download credits. Proceeding with update.", Level.SUCCESS)
+        self.__mPrinter.print("We have download credits. Proceeding with update.", Level.SUCCESS)
 
     # ---------------------------------
     # public instance methods
@@ -511,16 +522,16 @@ class Sonar:
         try:
             lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
             if not self.verbose:
-                Printer.print("SUCCESS: Connected to Rapid7 Open Data API", Level.PRINT_REGARDLESS)
+                self.__mPrinter.print("SUCCESS: Connected to Rapid7 Open Data API", Level.PRINT_REGARDLESS)
         except:
-            Printer.print("Connection test failed. Unable to connect to Rapid7 Open Data API", Level.ERROR)
+            self.__mPrinter.print("Connection test failed. Unable to connect to Rapid7 Open Data API", Level.ERROR)
 
     def check_quota(self) -> None:
         # Open Data API --> quota
         # "quota_allowed","quota_timespan","quota_used","quota_left","oldest_action_expires_in"
         lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
         l_quota = json.loads(lHTTPResponse.text)
-        Printer.print("{}/{} requests used in last {} hours. {} downloads remaining.".format(
+        self.__mPrinter.print("{}/{} requests used in last {} hours. {} downloads remaining.".format(
             l_quota['quota_used'],l_quota['quota_allowed'],int(int(l_quota['quota_timespan'])/self.__SECONDS_PER_HOUR), int(l_quota['quota_allowed']) - int(l_quota['quota_used'])), Level.PRINT_REGARDLESS
         )
 
@@ -528,7 +539,7 @@ class Sonar:
         l_studies = self.__get_studies()
         for l_study in l_studies:
             if self.__study_is_interesting(l_study):
-                self.__print_study_metadata(l_study)
+                self.__print_study_metadata(l_study, Override.FORCE_OUTPUT)
 
     def list_unparsed_files(self) -> None:
         study_uniqid = 0
@@ -541,7 +552,7 @@ class Sonar:
         port = 7
         l_usf_records: list = SQLite.get_unparsed_study_file_records()
         for l_record in l_usf_records:
-            Printer.print("{}\t{}\t{}\t{}-{}-{}".format(l_record[0],l_record[6],l_record[7],l_record[2],l_record[3],l_record[4],), Level.PRINT_REGARDLESS)
+            self.__mPrinter.print("{}\t{}\t{}\t{}-{}-{}".format(l_record[0],l_record[6],l_record[7],l_record[2],l_record[3],l_record[4],), Level.PRINT_REGARDLESS)
 
     def quota_exceeded(self) -> bool:
         # Open Data API --> quota
@@ -549,7 +560,7 @@ class Sonar:
         lHTTPResponse = self.__connect_to_open_data_api(self.__cQUOTA_URL)
         l_quota = json.loads(lHTTPResponse.text)
         l_downloads_left = int(l_quota['quota_left'])
-        Printer.print("{} Rapid7 OpenData API requests left".format(l_downloads_left), Level.INFO)
+        self.__mPrinter.print("{} Rapid7 OpenData API requests left".format(l_downloads_left), Level.INFO)
         return (l_downloads_left == 0)
 
     def update_studies(self) -> None:
@@ -563,7 +574,7 @@ class Sonar:
         l_protocols_already_parsed: list = []
         l_discovered_service_records: list = []
 
-        Printer.print("Fetching and parsing unparsed study files in search of network services", Level.INFO)
+        self.__mPrinter.print("Fetching and parsing unparsed study files in search of network services", Level.INFO)
 
         # if database not built, build database
         # TODO: Normalize database tables
@@ -589,7 +600,7 @@ class Sonar:
             l_port: int =  l_usf_record[PORT]
             l_protocol_id: str = "{}_{}".format(l_protocol, l_port)
 
-            Printer.print("Parsing study {}".format(l_study_filename), Level.INFO)
+            self.__mPrinter.print("Parsing study {}".format(l_study_filename), Level.INFO)
 
             if l_protocol_id in l_protocols_already_parsed:
                 SQLite.update_outdated_study_file_record(l_study_filename)
@@ -608,9 +619,9 @@ class Sonar:
                     subprocess.call(["touch", l_temp_filename])
                     l_output_file = open(l_temp_filename, APPEND)
                     l_number_patterns = len(l_indexed_search_patterns)
-                    Printer.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
+                    self.__mPrinter.print("Placing search results into temp file {}".format(l_temp_filename), Level.INFO)
                     for l_index, l_search_pattern in enumerate(l_indexed_search_patterns, start=1):
-                        Printer.print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), Level.INFO)
+                        self.__mPrinter.print("Searching pattern {} - {} of {} ({:0.2f}%) in {}".format(l_search_pattern, l_index, l_number_patterns, l_index/l_number_patterns*100, l_local_filename), Level.INFO)
                         subprocess.call(["zgrep", "-F", l_search_pattern,l_local_filename], stdout=l_output_file)
                         l_output_file.flush()
                     l_output_file.close()
@@ -620,16 +631,16 @@ class Sonar:
                             for l_search_pattern in l_indexed_search_patterns:
                                 if l_search_pattern in l_line:
                                     l_discovered_service_record: tuple = self.__parse_protocol_line(l_line,
-                                                                    self.__mOrganizations[l_indexed_search_patterns[l_search_pattern]],
+                                                                    self.__m_organizations[l_indexed_search_patterns[l_search_pattern]],
                                                                     l_usf_record)
                                     l_discovered_service_records.append(l_discovered_service_record)
-                                    Printer.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
+                                    self.__mPrinter.print("Service discovered: {}".format(l_discovered_service_record), Level.INFO)
 
                     SQLite.delete_obsolete_service_records(l_port, l_protocol)
                     if l_discovered_service_records:
                         SQLite.insert_discovered_service_records(l_discovered_service_records)
                     else:
-                        Printer.print("No {} services discovered in {}".format(l_study_unique_id, l_study_filename), Level.WARNING)
+                        self.__mPrinter.print("No {} services discovered in {}".format(l_study_unique_id, l_study_filename), Level.WARNING)
                     SQLite.update_parsed_study_file_record(l_study_filename)
                     self.__delete_study_file(l_local_filename)
 
