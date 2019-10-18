@@ -567,6 +567,7 @@ class Sonar:
         return (l_downloads_left == 0)
 
     def update_studies(self) -> None:
+        TIMESTAMP = 5
         PROTOCOL = 6
         PORT = 7
         STUDY_UNIQUE_ID = 0
@@ -605,12 +606,11 @@ class Sonar:
 
             self.__mPrinter.print("Parsing study {}".format(l_study_filename), Level.INFO)
 
-            if l_protocol_id in l_protocols_already_parsed:
-                SQLite.update_outdated_study_file_record(l_study_filename)
-            else:
+            if not l_protocol_id in l_protocols_already_parsed:
                 # if file has new information about a protocol, download the file, parse out the data and delete the file
                 l_protocols_already_parsed.append(l_protocol_id)
                 l_study_unique_id: str = l_usf_record[STUDY_UNIQUE_ID]
+                l_study_timestamp: int = l_usf_record[TIMESTAMP]
                 l_local_filename: str = self.__download_study_file(l_study_unique_id, l_study_filename)
 
                 if l_study_unique_id == Studies.SONAR_TCP.value or l_study_unique_id == Studies.SONAR_UDP.value:
@@ -645,6 +645,7 @@ class Sonar:
                     else:
                         self.__mPrinter.print("No {} services discovered in {}".format(l_study_unique_id, l_study_filename), Level.WARNING)
                     SQLite.update_parsed_study_file_record(l_study_filename)
+                    SQLite.update_outdated_study_file_records(l_port, l_protocol, l_study_timestamp)
                     self.__delete_study_file(l_local_filename)
 
                 else:
