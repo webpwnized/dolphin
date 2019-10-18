@@ -289,7 +289,7 @@ class SQLite():
         except sqlite3.Error as l_error:
             Printer.print("Error fetching study file records newer than {}".format(SQLite.__convert_epoch_to_string(p_timestamp)), Level.ERROR)
         except Exception as l_error:
-            Printer.print("EError fetching newer study file records: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
+            Printer.print("Error fetching newer study file records: {} {}".format(type(l_error).__name__, l_error), Level.ERROR)
         finally:
             if l_connection:
                 l_connection.close()

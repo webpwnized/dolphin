@@ -352,9 +352,12 @@ class Sonar:
 
             self.__print_study_filename_record(l_record)
             return l_record
-        except IndexError as l_index_error:
+        except (IndexError, ValueError) as l_error:
             l_record = None
-            self.__mPrinter.print("Unexpected format: {} {} {}".format(l_index_error, p_filename, l_parts), Level.WARNING)
+            self.__mPrinter.print("Unexpected format: {} {} {}".format(l_error, p_filename, l_parts), Level.WARNING)
+        except Exception as l_error:
+            l_record = None
+            self.__mPrinter.print("Unexpected format: {} {} {} {}".format(type(l_error).__name__, l_error, p_filename, l_parts), Level.WARNING)
 
     def __parse_protocol_line(self, p_study_file_line: str, p_organization: dict, p_study_file_record: list) -> tuple:
         # Discovered Service
