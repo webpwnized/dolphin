@@ -7,7 +7,8 @@ import config as Config
 import argparse
 import sys
 
-l_version = '0.1.18 beta'
+l_version = '0.1.19 beta'
+
 
 def run_main_program():
 
