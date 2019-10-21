@@ -7,6 +7,8 @@ import config as Config
 import argparse
 import sys
 
+l_version = '0.1.18 beta'
+
 def run_main_program():
 
     Printer.verbose = Parser.verbose
@@ -53,7 +55,8 @@ if __name__ == '__main__':
                |_|                  
  
  Automated Sonar file analysis - Fortuna Fortis Paratus
-""", formatter_class=RawTextHelpFormatter)
+ Version: {}
+""".format(l_version), formatter_class=RawTextHelpFormatter)
     lArgParser.add_argument('-v', '--verbose',
                             help='Enable verbose output such as current progress and duration',
                             action='store_true')
