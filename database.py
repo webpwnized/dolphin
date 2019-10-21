@@ -463,6 +463,7 @@ class SQLite():
                                "parsed_timestamp_string = datetime('{}', 'unixepoch', 'localtime') " \
                             "WHERE main.study_files.port = ? " \
                             "   AND main.study_files.protocol = ? " \
+                            "   AND main.study_files.parsed = 'N' " \
                             "   AND main.study_files.timestamp < ?;".format(l_now, l_now)
             l_parameters: tuple = (p_port, p_protocol, p_timestamp)
             l_records: list = SQLite.__execute_parameterized_query(l_connection, l_query, l_parameters)
